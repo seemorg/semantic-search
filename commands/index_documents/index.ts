@@ -59,7 +59,7 @@ const filteredBooks = booksToIndex.filter(({ slug }) => {
   }
   return true;
 });
-const bookChunks = chunk(filteredBooks, 300) as (typeof booksToIndex)[];
+const bookChunks = chunk(filteredBooks, 230) as (typeof booksToIndex)[];
 
 let chunkIdx = 0;
 
@@ -155,6 +155,32 @@ async function main() {
       // );
       continue;
     }
+
+    // check if some nodes with the same slug are already indexed
+    const existingNodes = await vectorStore
+      .client()
+      .scroll(process.env.QDRANT_COLLECTION, {
+        limit: 1,
+        filter: {
+          must: [
+            {
+              key: 'bookSlug',
+              match: {
+                value: slug,
+              },
+            },
+          ],
+        },
+      });
+
+    if (existingNodes.points.length > 0) {
+      console.log(`Book ${slug} already indexed. Deleting previous nodes...`);
+      await vectorStore.client().delete(process.env.QDRANT_COLLECTION, {
+        wait: true,
+        filter: { must: [{ key: 'bookSlug', match: { value: slug } }] },
+      });
+    }
+
     const batches = chunk(nodes, 80) as (typeof nodes)[];
     let i = 1;
     for (const batch of batches) {
