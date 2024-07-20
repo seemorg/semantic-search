@@ -59,7 +59,7 @@ const filteredBooks = booksToIndex.filter(({ slug }) => {
   }
   return true;
 });
-const bookChunks = chunk(filteredBooks, 150) as (typeof booksToIndex)[];
+const bookChunks = chunk(filteredBooks, 300) as (typeof booksToIndex)[];
 
 let chunkIdx = 0;
 
@@ -117,7 +117,7 @@ async function main() {
     const book = await getTurathBookById(turathId);
     const pages = book.pages.map((p) => {
       const pageText = stripHtml(removeTashkeel(p.text)).result;
-      const text = splitter.splitText(pageText).join(' ');
+      const text = splitter.splitText(pageText).join(' ').replaceAll('�', '');
 
       return {
         ...p,
