@@ -8,14 +8,27 @@ import {
   SimpleNodeParser,
 } from 'llamaindex';
 import fs from 'fs';
+import { writeFile } from 'fs/promises';
 import path from 'path';
 import { stripHtml } from 'string-strip-html';
-import { type Book, removeTashkeel, chunk } from './utils';
+import { removeTashkeel, chunk, getTurathBookById, sleep } from './utils';
 import { attachMetadataToNodes } from './metadata';
 import { createVectorStore } from 'src/shared/vector-store';
+import booksToIndex from './turath-books.json';
+
+const indexedBooks = JSON.parse(
+  fs.readFileSync(
+    path.resolve('commands/index_documents/', 'turath-indexed-books.json'),
+    'utf8',
+  ),
+) as unknown as Record<string, boolean>;
 
 const embedModel = new OpenAIEmbedding({
-  apiKey: process.env.OPENAI_API_KEY,
+  azure: {
+    apiKey: process.env.AZURE_SECRET_KEY,
+    deploymentName: process.env.AZURE_DEPLOYMENT_NAME,
+    endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com/`,
+  },
   model: 'text-embedding-3-large',
   embedBatchSize: 30,
 });
@@ -31,103 +44,159 @@ Settings.llm = new OpenAI({
 });
 Settings.embedModel = embedModel;
 
-const booksToIndex = [
-  { slug: 'sahih', path: '735.json' }, // bukhari
-  // { slug: 'muwatta', path: '16050.json' },
-  // { slug: 'fath-bari', path: '1673.json' }, // NEXT
-  // { slug: 'sunan-3', path: '98138.json' }, // sunan ibn majah
-  // { slug: 'ihya-culum-din', path: '9472.json' },
-];
-
-const splitter = new SentenceSplitter();
-
-const books = booksToIndex.map((b) => {
-  const book = JSON.parse(
-    fs.readFileSync(path.resolve('sample_books', b.path), 'utf8'),
-  ) as Book;
-
-  const pages = book.pages.map((p) => {
-    const pageText = stripHtml(removeTashkeel(p.text)).result;
-    return {
-      ...p,
-      text: splitter.splitText(pageText).join(' '),
-    };
-  });
-
-  const data = {
-    ...book,
-    pages,
-  };
-
-  return {
-    ...b,
-    data,
-    concatenatedContent: pages.map((p) => p.text).join(' '),
-  };
+const splitter = new SentenceSplitter({
+  splitLongSentences: true,
+});
+const parser = new SimpleNodeParser({
+  textSplitter: splitter,
 });
 
 const vectorStore = createVectorStore('DEV');
 
-async function main() {
-  const docs: Document[] = [];
+const filteredBooks = booksToIndex.filter(({ slug }) => {
+  if (indexedBooks[slug] === true) {
+    return false;
+  }
+  return true;
+});
+const bookChunks = chunk(filteredBooks, 150) as (typeof booksToIndex)[];
 
-  for (const book of books) {
-    const slug = book.slug;
+let chunkIdx = 0;
 
-    docs.push(
-      new Document({
-        metadata: {
-          bookSlug: slug,
-        },
-        text: book.concatenatedContent,
-      }),
+// get chunk from args
+const chunkArg = process.argv.find((arg) => arg.startsWith('--chunk='));
+if (chunkArg) {
+  const chunkNum = Number(chunkArg.split('=')[1]);
+  if (chunkNum >= 1 && chunkNum <= bookChunks.length) {
+    chunkIdx = chunkNum - 1;
+  } else {
+    console.error(
+      `Invalid chunk number. Enter a number from 1 to ${bookChunks.length}.`,
     );
+    process.exit(1);
+  }
+}
+
+let shouldWrite = false;
+const markBookIndexStatus = (slug: string, status: boolean = true) => {
+  indexedBooks[slug] = status;
+  shouldWrite = true;
+};
+
+const flush = async () => {
+  await writeFile(
+    path.resolve(`commands/index_documents/indexed-books-${chunkIdx}.json`),
+    JSON.stringify(indexedBooks, null, 2),
+  );
+  shouldWrite = false;
+};
+
+setInterval(async () => {
+  if (shouldWrite) {
+    await flush();
+  }
+}, 30 * 1000);
+
+const chunkToProcess = bookChunks[chunkIdx];
+
+console.log(`
+  PROCESSING CHUNK ${chunkIdx + 1} / ${bookChunks.length}
+  `);
+
+async function main() {
+  let collectionExists = false;
+  try {
+    await vectorStore.client().getCollection(process.env.QDRANT_COLLECTION);
+    collectionExists = true;
+  } catch (e) {}
+  if (!collectionExists) {
+    console.log('Creating collection...');
+    await vectorStore.createCollection(process.env.QDRANT_COLLECTION, 3072);
   }
 
   const index = await VectorStoreIndex.fromVectorStore(vectorStore);
+  let bookIdx = 0;
+  for (const { id, slug, versions } of chunkToProcess) {
+    bookIdx++;
 
-  const parser = new SimpleNodeParser();
-  console.log('Parsing documents...');
-
-  const nodes = parser.getNodesFromDocuments(docs);
-  attachMetadataToNodes(nodes, books);
-
-  // fs.writeFileSync(
-  //   'nodes.json',
-  //   JSON.stringify(
-  //     nodes.map((n) => ({
-  //       text: n.text,
-  //       metadata: n.metadata,
-  //     })),
-  //     null,
-  //     2,
-  //   ),
-  // );
-
-  // fs.writeFileSync(
-  //   'text.json',
-  //   JSON.stringify(
-  //     {
-  //       texts: books[0].data.pages,
-  //     },
-  //     null,
-  //     2,
-  //   ),
-  // );
-
-  const batches = chunk(nodes, 30) as (typeof nodes)[];
-  let i = 1;
-  for (const batch of batches) {
-    console.log(`Processing batch ${i} / ${batches.length}...`);
-    try {
-      await index.insertNodes(batch);
-    } catch (e) {
-      console.error(e);
-      console.log(`Failed to insert batch ${i} / ${batches.length}.`);
+    console.log(
+      `Processing book ${id} (${bookIdx} / ${chunkToProcess.length})...`,
+    );
+    const turathId = versions.find((v) => v.source === 'turath')?.value;
+    if (!turathId) {
+      continue;
     }
-    i++;
+    const book = await getTurathBookById(turathId);
+    const pages = book.pages.map((p) => {
+      const pageText = stripHtml(removeTashkeel(p.text)).result;
+      const text = splitter.splitText(pageText).join(' ');
+
+      return {
+        ...p,
+        text,
+      };
+    });
+    const data = {
+      slug,
+      data: {
+        headings: book.indexes.headings,
+        pageHeadings: book.indexes.page_headings,
+        pages,
+      },
+      concatenatedContent: pages.map((p) => p.text).join(' '),
+    };
+    const document = new Document({
+      metadata: {
+        bookSlug: slug,
+      },
+      text: data.concatenatedContent,
+    });
+    const nodes = parser.getNodesFromDocuments([document]);
+    try {
+      attachMetadataToNodes(nodes, data);
+    } catch (e) {
+      console.log(`Failed to attach metadata to book ${slug}.`);
+      markBookIndexStatus(slug, false);
+      fs.writeFileSync(
+        path.resolve(`commands/index_documents/nodes-${slug}.json`),
+        JSON.stringify(nodes, null, 2),
+      );
+      fs.writeFileSync(
+        path.resolve(`commands/index_documents/pages-${slug}.json`),
+        JSON.stringify(data.data.pages, null, 2),
+      );
+      continue;
+    }
+    const batches = chunk(nodes, 80) as (typeof nodes)[];
+    let i = 1;
+    for (const batch of batches) {
+      console.log(
+        `[${id} - ${bookIdx} / ${chunkToProcess.length}] Processing batch ${i} / ${batches.length}...`,
+      );
+      const chunkBatches = chunk(batch, 10) as (typeof batch)[];
+      await Promise.all(
+        chunkBatches.map(async (batch, chunkI) => {
+          let success = false;
+          while (!success) {
+            try {
+              await index.insertNodes(batch);
+              success = true;
+            } catch (e) {
+              console.error(
+                `Failed to insert batch (${i} -> ${chunkI}) / ${batches.length}. (${e.message})`,
+              );
+              // sleep for 10s
+              await sleep(10);
+            }
+          }
+        }),
+      );
+      i++;
+    }
+    markBookIndexStatus(slug, true);
   }
 
+  await flush();
   console.log('Done!');
 }
 

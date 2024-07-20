@@ -1,7 +1,8 @@
+import { QdrantClient } from '@qdrant/js-client-rest';
 import {
   // ChromaVectorStore,
-  MilvusVectorStore,
-  OpenAIEmbedding,
+  QdrantVectorStore,
+  // OpenAIEmbedding,
 } from 'llamaindex';
 
 // export const createVectorStore = (mode: 'DEV' | 'PROD' = 'PROD') => {
@@ -24,25 +25,27 @@ import {
 //   });
 // };
 
-export const createVectorStore = (mode: 'DEV' | 'PROD' = 'PROD') => {
-  return new MilvusVectorStore({
-    collection: process.env.MILVUS_COLLECTION,
-    params: {
-      configOrAddress: process.env.MILVUS_URL,
-    },
-    // chromaClientParams: {
-    //   path: process.env.CHROMA_PATH,
-    // },
-    embedModel: new OpenAIEmbedding({
-      apiKey: process.env.OPENAI_API_KEY,
-      model: 'text-embedding-3-large',
-      additionalSessionOptions: {
-        baseURL: 'https://oai.helicone.ai/v1',
-        defaultHeaders: {
-          'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
-          'Helicone-Property-Environment': mode,
-        },
-      },
-    }),
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const createVectorStore = (_mode: 'DEV' | 'PROD' = 'PROD') => {
+  const client = new QdrantClient({
+    url: process.env.QDRANT_URL,
+    apiKey: process.env.QDRANT_API_KEY,
+    port: 443,
+  });
+
+  return new QdrantVectorStore({
+    collectionName: process.env.QDRANT_COLLECTION,
+    client: client,
+    // embedModel: new OpenAIEmbedding({
+    //   apiKey: process.env.OPENAI_API_KEY,
+    //   model: 'text-embedding-3-large',
+    //   additionalSessionOptions: {
+    //     baseURL: 'https://oai.helicone.ai/v1',
+    //     defaultHeaders: {
+    //       'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
+    //       'Helicone-Property-Environment': mode,
+    //     },
+    //   },
+    // }),
   });
 };

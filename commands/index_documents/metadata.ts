@@ -1,48 +1,49 @@
 import { TextNode } from 'llamaindex';
 import {
-  Book,
   createPageToChapterIndex,
   getBookPositions,
   getChapterTitle,
   removeTashkeel,
 } from './utils';
+import { TurathBookResponse } from 'src/types/turath';
 
 export const attachMetadataToNodes = (
   nodes: TextNode[],
-  books: {
+  book: {
     slug: string;
-    data: Book;
+    data: {
+      pages: TurathBookResponse['pages'];
+      headings: TurathBookResponse['indexes']['headings'];
+      pageHeadings: TurathBookResponse['indexes']['page_headings'];
+    };
     concatenatedContent: string;
-  }[],
+  },
 ) => {
+  const positions = getBookPositions(book.data.pages);
+  const pageIndexToChapterIndex = createPageToChapterIndex(
+    book.data.pageHeadings,
+  );
+
   // pre-process node
   // 1. set chapter & page number in metadata
   // 2. remove tashkeel
   let i = 0;
   for (const node of nodes) {
     i++;
-    const bookSlug = node.metadata?.bookSlug as string;
-    if (!bookSlug) continue;
-
-    const book = books.find((b) => b.slug === bookSlug);
-    if (!book) continue;
-
-    const pageIndexToChapterIndex = createPageToChapterIndex(
-      bookSlug,
-      book.data,
-    );
 
     const matchedPageIndices = new Set<number>();
 
-    const chunkStart = book.concatenatedContent.indexOf(node.text);
+    const chunkStart = book.concatenatedContent.indexOf(
+      node.text.replaceAll('�', ''),
+    );
     const chunkEnd = chunkStart + node.text.length;
 
     if (chunkStart === -1) {
       console.log(`[NODE ${i}] Could not link metadata!`);
-      continue;
+      throw new Error('Could not link metadata!');
     }
 
-    getBookPositions(bookSlug, book.data)
+    positions
       .filter((pos) => pos.start <= chunkEnd && pos.end >= chunkStart)
       .forEach((p) => {
         matchedPageIndices.add(p.idx);
@@ -64,26 +65,33 @@ export const attachMetadataToNodes = (
     });
 
     const matchedIndicesArray = Array.from(matchedPageIndices);
-    const pageNumbers = [
-      ...new Set(
-        matchedIndicesArray
-          .map((idx) => ({
-            page: book.data.pages[idx].page,
-            vol: book.data.pages[idx].vol,
-          }))
-          .map((p) => `v${p.vol}:p${p.page}`),
-      ),
-    ];
+
+    const _pageNumbers = matchedIndicesArray.map((idx) => ({
+      page: book.data.pages[idx].page,
+      vol: book.data.pages[idx].vol,
+    }));
+
+    // remove duplicates from pageNumbers
+    const pageNumbersSet = new Set<string>();
+    const pageNumbers = _pageNumbers.filter((page) => {
+      const key = `${page.vol}-${page.page}`;
+      if (pageNumbersSet.has(key)) {
+        return false;
+      }
+      pageNumbersSet.add(key);
+      return true;
+    });
+
     const chapterTitles = [
       ...new Set(
         matchedIndicesArray.flatMap((idx) =>
-          getChapterTitle(book.data, idx, pageIndexToChapterIndex),
+          getChapterTitle(book.data.headings, idx, pageIndexToChapterIndex),
         ),
       ),
     ];
 
-    node.metadata.chapters = JSON.stringify(chapterTitles.map(removeTashkeel));
-    node.metadata.pages = JSON.stringify(pageNumbers);
+    node.metadata.chapters = chapterTitles.map(removeTashkeel);
+    node.metadata.pages = pageNumbers;
 
     node.setContent(node.text);
   }

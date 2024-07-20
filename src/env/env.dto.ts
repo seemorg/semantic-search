@@ -10,10 +10,13 @@ export class EnvironmentVariables {
   OPENAI_API_KEY: string;
 
   @IsString()
-  CHROMA_PATH: string;
+  QDRANT_URL: string;
 
   @IsString()
-  CHROMA_COLLECTION: string;
+  QDRANT_API_KEY: string;
+
+  @IsString()
+  QDRANT_COLLECTION: string;
 
   @IsString()
   HELICONE_API_KEY: string;
