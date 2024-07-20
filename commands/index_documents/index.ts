@@ -77,25 +77,13 @@ if (chunkArg) {
   }
 }
 
-let shouldWrite = false;
-const markBookIndexStatus = (slug: string, status: boolean = true) => {
+const markBookIndexStatus = async (slug: string, status: boolean = true) => {
   indexedBooks[slug] = status;
-  shouldWrite = true;
-};
-
-const flush = async () => {
   await writeFile(
     path.resolve(`commands/index_documents/indexed-books-${chunkIdx}.json`),
     JSON.stringify(indexedBooks, null, 2),
   );
-  shouldWrite = false;
 };
-
-setInterval(async () => {
-  if (shouldWrite) {
-    await flush();
-  }
-}, 30 * 1000);
 
 const chunkToProcess = bookChunks[chunkIdx];
 
@@ -156,15 +144,15 @@ async function main() {
       attachMetadataToNodes(nodes, data);
     } catch (e) {
       console.log(`Failed to attach metadata to book ${slug}.`);
-      markBookIndexStatus(slug, false);
-      fs.writeFileSync(
-        path.resolve(`commands/index_documents/nodes-${slug}.json`),
-        JSON.stringify(nodes, null, 2),
-      );
-      fs.writeFileSync(
-        path.resolve(`commands/index_documents/pages-${slug}.json`),
-        JSON.stringify(data.data.pages, null, 2),
-      );
+      await markBookIndexStatus(slug, false);
+      // fs.writeFileSync(
+      //   path.resolve(`commands/index_documents/nodes-${slug}.json`),
+      //   JSON.stringify(nodes, null, 2),
+      // );
+      // fs.writeFileSync(
+      //   path.resolve(`commands/index_documents/pages-${slug}.json`),
+      //   JSON.stringify(data.data.pages, null, 2),
+      // );
       continue;
     }
     const batches = chunk(nodes, 80) as (typeof nodes)[];
@@ -193,10 +181,9 @@ async function main() {
       );
       i++;
     }
-    markBookIndexStatus(slug, true);
+    await markBookIndexStatus(slug, true);
   }
 
-  await flush();
   console.log('Done!');
 }
 
