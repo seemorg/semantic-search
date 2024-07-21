@@ -1,3 +1,4 @@
+import { QdrantClient } from '@qdrant/js-client-rest';
 import { Block, parseMarkdown } from '@openiti/markdown-parser';
 import { TurathBookResponse } from 'src/types/turath';
 import slugify from 'slugify';
@@ -209,3 +210,49 @@ function generateHeaderId(content: string, prevSlugs: Set<string>) {
 
 export const sleep = (s: number) =>
   new Promise((resolve) => setTimeout(resolve, s * 1000));
+
+export // check if some nodes with the same slug are already indexed
+const deleteNodesIfExist = async (client: QdrantClient, slug: string) => {
+  let success = false;
+  let hasPoints = false;
+  while (!success) {
+    try {
+      const existingNodes = await client.scroll(process.env.QDRANT_COLLECTION, {
+        limit: 1,
+        filter: {
+          must: [
+            {
+              key: 'bookSlug',
+              match: {
+                value: slug,
+              },
+            },
+          ],
+        },
+      });
+      success = true;
+      hasPoints = existingNodes.points.length > 0;
+    } catch (e) {
+      console.error('Failed to fetch points from vector DB.');
+      await sleep(10);
+    }
+  }
+
+  if (hasPoints) {
+    console.log(`Book ${slug} already indexed. Deleting previous nodes...`);
+
+    let successDelete = false;
+    while (!successDelete) {
+      try {
+        await client.delete(process.env.QDRANT_COLLECTION, {
+          wait: true,
+          filter: { must: [{ key: 'bookSlug', match: { value: slug } }] },
+        });
+        successDelete = true;
+      } catch (e) {
+        console.error('Failed to delete nodes from vector DB.');
+        await sleep(10);
+      }
+    }
+  }
+};
