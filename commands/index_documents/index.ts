@@ -65,7 +65,7 @@ const filteredBooks = booksToIndex.filter(({ slug }) => {
   }
   return true;
 });
-const bookChunks = chunk(filteredBooks, 230) as (typeof booksToIndex)[];
+const bookChunks = chunk(filteredBooks, 400) as (typeof booksToIndex)[];
 
 let chunkIdx = 0;
 
