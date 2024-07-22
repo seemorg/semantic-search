@@ -125,7 +125,11 @@ async function main() {
     const book = await getTurathBookById(turathId);
     const pages = book.pages.map((p) => {
       const pageText = stripHtml(removeTashkeel(p.text)).result;
-      const text = splitter.splitText(pageText).join(' ').replaceAll('�', '');
+      const text = splitter
+        .splitText(pageText)
+        .join(' ')
+        .replaceAll('�', '')
+        .replaceAll('\n\n\n', ' ');
 
       return {
         ...p,

@@ -114,6 +114,7 @@ export const getOpenitiBookById = async (id: string, versionId: string) => {
   }
 
   const text = await response.text();
+  console.log(response.url);
 
   const final = parseMarkdown(text);
 

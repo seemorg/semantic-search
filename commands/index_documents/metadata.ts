@@ -39,7 +39,7 @@ export const attachMetadataToNodes = (
     const chunkEnd = chunkStart + node.text.length;
 
     if (chunkStart === -1) {
-      console.log(`[NODE ${i}] Could not link metadata!`);
+      console.log(`[NODE ${i} - ${node.id_}] Could not link metadata!`);
       throw new Error('Could not link metadata!');
     }
 
