@@ -6,8 +6,8 @@ export class EnvironmentVariables {
   @IsOptional()
   NODE_ENV: Environment = Environment.Development;
 
-  @IsString()
-  OPENAI_API_KEY: string;
+  // @IsString()
+  // OPENAI_API_KEY: string;
 
   @IsString()
   QDRANT_URL: string;
@@ -20,6 +20,18 @@ export class EnvironmentVariables {
 
   @IsString()
   HELICONE_API_KEY: string;
+
+  @IsString()
+  AZURE_EMBEDDINGS_DEPLOYMENT_NAME: string;
+
+  @IsString()
+  AZURE_LLM_DEPLOYMENT_NAME: string;
+
+  @IsString()
+  AZURE_RESOURCE_NAME: string;
+
+  @IsString()
+  AZURE_SECRET_KEY: string;
 
   @IsPort()
   @IsOptional()
