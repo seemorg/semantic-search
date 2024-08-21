@@ -6,12 +6,13 @@ export const setLlamaindexSettings = (_mode: 'DEV' | 'PROD' = 'PROD') => {
   Settings.chunkSize = 1024;
   Settings.chunkOverlap = 20;
   Settings.llm = new OpenAI({
+    apiKey: '',
     temperature: 0,
     azure: {
       apiKey: process.env.AZURE_SECRET_KEY,
-      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com/`,
-      apiVersion: '2024-05-13',
-      deploymentName: `openai/deployments/${process.env.AZURE_LLM_DEPLOYMENT_NAME}`,
+      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
+      // apiVersion: '2024-05-13',
+      deploymentName: process.env.AZURE_LLM_DEPLOYMENT_NAME,
     },
     model: 'gpt-4o',
     // additionalSessionOptions: {
@@ -26,11 +27,12 @@ export const setLlamaindexSettings = (_mode: 'DEV' | 'PROD' = 'PROD') => {
   });
 
   Settings.embedModel = new OpenAIEmbedding({
+    apiKey: '',
     azure: {
       apiKey: process.env.AZURE_SECRET_KEY,
-      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com/`,
-      apiVersion: '1',
+      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
       deploymentName: process.env.AZURE_EMBEDDINGS_DEPLOYMENT_NAME,
+      // apiVersion: '1',
     },
     model: 'text-embedding-3-large',
     // additionalSessionOptions: {

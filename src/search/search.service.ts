@@ -6,16 +6,22 @@ import { createVectorStore } from 'src/shared/vector-store';
 export class SearchService {
   private readonly vectorStore = createVectorStore();
   private readonly llm = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: '',
+    azure: {
+      apiKey: process.env.AZURE_SECRET_KEY,
+      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
+      // apiVersion: '2024-05-13',
+      deploymentName: process.env.AZURE_LLM_DEPLOYMENT_NAME,
+    },
     model: 'gpt-4o',
     temperature: 0,
     maxTokens: 1000,
-    additionalSessionOptions: {
-      baseURL: 'https://oai.helicone.ai/v1',
-      defaultHeaders: {
-        'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
-      },
-    },
+    // additionalSessionOptions: {
+    //   baseURL: 'https://oai.helicone.ai/v1',
+    //   defaultHeaders: {
+    //     'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
+    //   },
+    // },
     additionalChatOptions: {
       response_format: { type: 'json_object' },
     },

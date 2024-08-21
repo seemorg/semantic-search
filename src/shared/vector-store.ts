@@ -31,6 +31,7 @@ export const createVectorStore = (_mode: 'DEV' | 'PROD' = 'PROD') => {
     url: process.env.QDRANT_URL,
     apiKey: process.env.QDRANT_API_KEY,
     port: 443,
+    https: true,
   });
 
   return new QdrantVectorStore({
