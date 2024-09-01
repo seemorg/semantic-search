@@ -1,11 +1,9 @@
 import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { TextNode } from 'llamaindex';
-// import { PineconeService } from 'src/pinecone/pinecone.service';
 
 @Controller('/search')
 export class SearchController {
-  // constructor(private readonly pineconeService: PineconeService) {}
   constructor(private readonly searchService: SearchService) {}
 
   @Get('/')

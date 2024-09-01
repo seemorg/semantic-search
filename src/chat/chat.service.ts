@@ -5,18 +5,17 @@ import {
   TextNode,
   Response,
   serviceContextFromDefaults,
-  OpenAI,
 } from 'llamaindex';
 import { Injectable, MessageEvent } from '@nestjs/common';
-import { AppConfigService } from 'src/env/env.service';
 import { ChatDto } from './dto/chat.dto';
 import { Observable } from 'rxjs';
 import { FeedbackDto } from './dto/feedback.dto';
 import { createVectorStore } from 'src/shared/vector-store';
+import { createAzureOpenAI } from 'src/shared/azure-openai';
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly appConfig: AppConfigService) {}
+  constructor() {}
 
   private readonly vectorStore = createVectorStore();
 
@@ -69,16 +68,8 @@ export class ChatService {
       queryEngine,
       chatHistory,
       serviceContext: serviceContextFromDefaults({
-        llm: new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY,
-          model: 'gpt-4o',
+        llm: createAzureOpenAI({
           temperature: body.isRetry === 'true' ? 0.3 : 0,
-          additionalSessionOptions: {
-            baseURL: 'https://oai.helicone.ai/v1',
-            defaultHeaders: {
-              'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
-            },
-          },
         }),
       }),
       condenseMessagePrompt({ chatHistory, question }) {

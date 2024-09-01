@@ -1,27 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { OpenAI, TextNode, VectorStoreIndex } from 'llamaindex';
+import { TextNode, VectorStoreIndex } from 'llamaindex';
+import { createAzureOpenAI } from 'src/shared/azure-openai';
 import { createVectorStore } from 'src/shared/vector-store';
 
 @Injectable()
 export class SearchService {
   private readonly vectorStore = createVectorStore();
-  private readonly llm = new OpenAI({
-    apiKey: '',
-    azure: {
-      apiKey: process.env.AZURE_SECRET_KEY,
-      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
-      // apiVersion: '2024-05-13',
-      deploymentName: process.env.AZURE_LLM_DEPLOYMENT_NAME,
-    },
-    model: 'gpt-4o',
-    temperature: 0,
+  private readonly llm = createAzureOpenAI({
     maxTokens: 1000,
-    // additionalSessionOptions: {
-    //   baseURL: 'https://oai.helicone.ai/v1',
-    //   defaultHeaders: {
-    //     'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
-    //   },
-    // },
     additionalChatOptions: {
       response_format: { type: 'json_object' },
     },
@@ -45,13 +31,6 @@ export class SearchService {
         ],
       },
     });
-
-    // const example = {
-    //   highlights: [
-    //     'Some text that is relevant to the user query',
-    //     'Another piece of text that is relevant to the user query',
-    //   ],
-    // };
 
     const response = await this.llm.chat({
       messages: [
