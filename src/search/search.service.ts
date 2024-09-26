@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { TextNode, VectorStoreIndex } from 'llamaindex';
+import { Metadata, NodeWithScore, TextNode } from 'llamaindex';
 import { createAzureOpenAI } from 'src/shared/azure-openai';
-import { createVectorStore } from 'src/shared/vector-store';
+import { createVectorStoreIndex } from 'src/shared/vector-store';
 
 @Injectable()
 export class SearchService {
-  private readonly vectorStore = createVectorStore();
+  private readonly vectorStoreIndex = createVectorStoreIndex();
+
   private readonly llm = createAzureOpenAI({
     maxTokens: 1000,
     additionalChatOptions: {
@@ -14,7 +15,8 @@ export class SearchService {
   });
 
   async searchWithinBook(bookSlug: string, query: string) {
-    const index = await VectorStoreIndex.fromVectorStore(this.vectorStore);
+    const index = await this.vectorStoreIndex;
+
     const queryEngine = index.asRetriever({
       similarityTopK: 10,
     });
@@ -32,6 +34,15 @@ export class SearchService {
       },
     });
 
+    const updatedResults = await this.highlightRelevantText(query, results);
+
+    return updatedResults;
+  }
+
+  private async highlightRelevantText(
+    query: string,
+    results: NodeWithScore<Metadata>[],
+  ) {
     const response = await this.llm.chat({
       messages: [
         {

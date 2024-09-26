@@ -1,6 +1,5 @@
 import {
   CondenseQuestionChatEngine,
-  VectorStoreIndex,
   ChatMessage,
   TextNode,
   Response,
@@ -10,17 +9,22 @@ import { Injectable, MessageEvent } from '@nestjs/common';
 import { ChatDto } from './dto/chat.dto';
 import { Observable } from 'rxjs';
 import { FeedbackDto } from './dto/feedback.dto';
-import { createVectorStore } from 'src/shared/vector-store';
+import { createVectorStoreIndex } from 'src/shared/vector-store';
 import { createAzureOpenAI } from 'src/shared/azure-openai';
 
 @Injectable()
 export class ChatService {
   constructor() {}
 
-  private readonly vectorStore = createVectorStore();
+  private readonly vectorStoreIndex = createVectorStoreIndex();
+  private readonly retryServiceContext = serviceContextFromDefaults({
+    llm: createAzureOpenAI({
+      temperature: 0.3,
+    }),
+  });
 
   async chatWithBook(bookSlug: string, body: ChatDto) {
-    const index = await VectorStoreIndex.fromVectorStore(this.vectorStore);
+    const index = await this.vectorStoreIndex;
 
     const queryEngine = index.asQueryEngine({
       similarityTopK: 5,
@@ -67,11 +71,9 @@ export class ChatService {
     const chatEngine = new CondenseQuestionChatEngine({
       queryEngine,
       chatHistory,
-      serviceContext: serviceContextFromDefaults({
-        llm: createAzureOpenAI({
-          temperature: body.isRetry === 'true' ? 0.3 : 0,
-        }),
-      }),
+      ...(body.isRetry === 'true'
+        ? { serviceContext: this.retryServiceContext }
+        : {}),
       condenseMessagePrompt({ chatHistory, question }) {
         return `Given a conversation (between Human and Assistant) and a follow up message from Human, rewrite the message to be a standalone question that captures all relevant context from the conversation. The standalone question must be in the same language as the user input.
 
@@ -88,7 +90,6 @@ export class ChatService {
 
     const response = await chatEngine.chat({
       message: body.question,
-      verbose: true,
       stream: true,
     });
 
