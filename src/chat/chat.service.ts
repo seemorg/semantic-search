@@ -14,15 +14,30 @@ import { FeedbackDto } from './dto/feedback.dto';
 import { createVectorStoreIndex } from 'src/shared/vector-store';
 import { createAzureOpenAI } from 'src/shared/azure-openai';
 import { ROUTER_PROMPT } from './prompts/router.prompt';
-import { AUTHOR_PROMPT } from './prompts/author.prompt';
-import { BOOK_PROMPT } from './prompts/book.prompt';
+import { makeAuthorPrompt } from './prompts/author.prompt';
+import { makeBookPrompt } from './prompts/book.prompt';
+import { UsulService } from '../usul/usul.service';
+import { LRUCache } from 'lru-cache';
+import { UsulBookDetailsResponse } from 'src/types/usul';
 
 @Injectable()
 export class ChatService {
-  constructor() {}
+  constructor(private readonly usulService: UsulService) {}
 
   private readonly vectorStoreIndex = createVectorStoreIndex();
+  private readonly routingLlm = createAzureOpenAI({ temperature: 0 });
   private readonly llm = createAzureOpenAI({ temperature: 0.5 });
+  private readonly cache = new LRUCache<string, UsulBookDetailsResponse>({
+    max: 500,
+    fetchMethod: async (key) => {
+      const book = await this.usulService.getBookDetails(key);
+      if (!book) {
+        return;
+      }
+
+      return book;
+    },
+  });
 
   private readonly retryServiceContext = serviceContextFromDefaults({
     llm: createAzureOpenAI({
@@ -31,7 +46,7 @@ export class ChatService {
   });
 
   async routeQuery(history: ChatMessage[], query: string) {
-    const response = await this.llm.chat({
+    const response = await this.routingLlm.chat({
       additionalChatOptions: {
         response_format: { type: 'json_object' },
       },
@@ -56,18 +71,24 @@ export class ChatService {
       intent.intent
     ];
 
-    console.log(`Routed query to ${parsedIntent}`);
-
     return parsedIntent;
   }
 
-  async answerAuthorQuery(history: ChatMessage[], query: string) {
+  async answerAuthorQuery({
+    bookDetails,
+    history,
+    query,
+  }: {
+    bookDetails: UsulBookDetailsResponse;
+    history: ChatMessage[];
+    query: string;
+  }) {
     const response = await this.llm.chat({
       stream: true,
       messages: [
         {
           role: 'system',
-          content: AUTHOR_PROMPT,
+          content: makeAuthorPrompt(bookDetails),
         },
         ...history,
         { role: 'user', content: query },
@@ -76,13 +97,22 @@ export class ChatService {
 
     return response;
   }
-  async answerSummaryQuery(history: ChatMessage[], query: string) {
+
+  async answerSummaryQuery({
+    bookDetails,
+    history,
+    query,
+  }: {
+    bookDetails: UsulBookDetailsResponse;
+    history: ChatMessage[];
+    query: string;
+  }) {
     const response = await this.llm.chat({
       stream: true,
       messages: [
         {
           role: 'system',
-          content: BOOK_PROMPT,
+          content: makeBookPrompt(bookDetails),
         },
         ...history,
         { role: 'user', content: query },
@@ -125,14 +155,24 @@ export class ChatService {
     }
 
     if (routerResult === 'author') {
+      const bookDetails = await this.cache.fetch(bookSlug);
       return this.asyncChatResponseChunkToObservable(
-        await this.answerAuthorQuery(chatHistory, body.question),
+        await this.answerAuthorQuery({
+          bookDetails,
+          history: chatHistory,
+          query: body.question,
+        }),
       );
     }
 
     if (routerResult === 'summary') {
+      const bookDetails = await this.cache.fetch(bookSlug);
       return this.asyncChatResponseChunkToObservable(
-        await this.answerSummaryQuery(chatHistory, body.question),
+        await this.answerSummaryQuery({
+          bookDetails,
+          history: chatHistory,
+          query: body.question,
+        }),
       );
     }
 
