@@ -4,6 +4,8 @@ import {
   TextNode,
   Response,
   serviceContextFromDefaults,
+  ChatResponseChunk,
+  ToolCallLLMMessageOptions,
 } from 'llamaindex';
 import { Injectable, MessageEvent } from '@nestjs/common';
 import { ChatDto } from './dto/chat.dto';
@@ -11,19 +13,86 @@ import { Observable } from 'rxjs';
 import { FeedbackDto } from './dto/feedback.dto';
 import { createVectorStoreIndex } from 'src/shared/vector-store';
 import { createAzureOpenAI } from 'src/shared/azure-openai';
+import { ROUTER_PROMPT } from './prompts/router.prompt';
+import { AUTHOR_PROMPT } from './prompts/author.prompt';
+import { BOOK_PROMPT } from './prompts/book.prompt';
 
 @Injectable()
 export class ChatService {
   constructor() {}
 
   private readonly vectorStoreIndex = createVectorStoreIndex();
+  private readonly llm = createAzureOpenAI({ temperature: 0.5 });
+
   private readonly retryServiceContext = serviceContextFromDefaults({
     llm: createAzureOpenAI({
       temperature: 0.3,
     }),
   });
 
-  async chatWithBook(bookSlug: string, body: ChatDto) {
+  async routeQuery(history: ChatMessage[], query: string) {
+    const response = await this.llm.chat({
+      additionalChatOptions: {
+        response_format: { type: 'json_object' },
+      },
+      messages: [
+        {
+          role: 'system',
+          content: ROUTER_PROMPT,
+        },
+        ...history,
+        {
+          role: 'user',
+          content: query,
+        },
+      ],
+    });
+
+    const intent = JSON.parse(response.message.content as string) as {
+      intent: 'A' | 'B' | 'C';
+    };
+
+    const parsedIntent = ({ A: 'author', B: 'summary', C: 'content' } as const)[
+      intent.intent
+    ];
+
+    console.log(`Routed query to ${parsedIntent}`);
+
+    return parsedIntent;
+  }
+
+  async answerAuthorQuery(history: ChatMessage[], query: string) {
+    const response = await this.llm.chat({
+      stream: true,
+      messages: [
+        {
+          role: 'system',
+          content: AUTHOR_PROMPT,
+        },
+        ...history,
+        { role: 'user', content: query },
+      ],
+    });
+
+    return response;
+  }
+  async answerSummaryQuery(history: ChatMessage[], query: string) {
+    const response = await this.llm.chat({
+      stream: true,
+      messages: [
+        {
+          role: 'system',
+          content: BOOK_PROMPT,
+        },
+        ...history,
+        { role: 'user', content: query },
+      ],
+    });
+
+    return response;
+  }
+
+  async getQueryEngine(bookSlug: string) {
     const index = await this.vectorStoreIndex;
 
     const queryEngine = index.asQueryEngine({
@@ -39,20 +108,38 @@ export class ChatService {
       },
     });
 
-    // queryEngine.updatePrompts({
-    //   'responseSynthesizer:textQATemplate': ({ context = '', query = '' }) => {
-    //     return `Below are snippets of relevant portions of the Sahih text for Al-Bukhari:
-    // ---------------------
-    // ${context}
-    // ---------------------
-    // Given the above text and no other prior knowledge, answer the query. Give direct quotes.
-    // Query: ${query}
-    // Answer:`;
-    //   },
-    // });
+    return queryEngine;
+  }
 
-    if (body.messages.length === 0) {
-      // If there are no messages, don't use CondenseQuestionChatEngine
+  async chatWithBook(bookSlug: string, body: ChatDto) {
+    const chatHistory = body.messages.map(
+      (m): ChatMessage => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      }),
+    );
+
+    let routerResult: 'author' | 'summary' | 'content' | null = null;
+    if (bookSlug === 'ihya-culum-din') {
+      routerResult = await this.routeQuery(chatHistory, body.question);
+    }
+
+    if (routerResult === 'author') {
+      return this.asyncChatResponseChunkToObservable(
+        await this.answerAuthorQuery(chatHistory, body.question),
+      );
+    }
+
+    if (routerResult === 'summary') {
+      return this.asyncChatResponseChunkToObservable(
+        await this.answerSummaryQuery(chatHistory, body.question),
+      );
+    }
+
+    const queryEngine = await this.getQueryEngine(bookSlug);
+
+    // If there are no messages, don't use CondenseQuestionChatEngine
+    if (chatHistory.length === 0) {
       return this.asyncIteratorToObservable(
         await queryEngine.query({
           stream: true,
@@ -60,13 +147,6 @@ export class ChatService {
         }),
       );
     }
-
-    const chatHistory = body.messages.map(
-      (m): ChatMessage => ({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.text,
-      }),
-    );
 
     const chatEngine = new CondenseQuestionChatEngine({
       queryEngine,
@@ -88,12 +168,12 @@ export class ChatService {
       },
     });
 
-    const response = await chatEngine.chat({
-      message: body.question,
-      stream: true,
-    });
-
-    return this.asyncIteratorToObservable(response);
+    return this.asyncIteratorToObservable(
+      await chatEngine.chat({
+        message: body.question,
+        stream: true,
+      }),
+    );
   }
 
   private asyncIteratorToObservable(iterator: AsyncIterable<Response>) {
@@ -109,16 +189,58 @@ export class ChatService {
     });
   }
 
+  private asyncChatResponseChunkToObservable(
+    iterator: AsyncIterable<ChatResponseChunk<ToolCallLLMMessageOptions>>,
+  ) {
+    return new Observable<MessageEvent>((subscriber) => {
+      (async () => {
+        for await (const chunk of iterator) {
+          subscriber.next({
+            data: {
+              response: chunk.delta,
+              sourceNodes: null,
+              metadata: {},
+            },
+          });
+        }
+
+        subscriber.next({ data: 'FINISH' });
+        subscriber.complete();
+      })();
+    });
+  }
+
+  private finalResponseToObservable(res: Response) {
+    return new Observable<MessageEvent>((subscriber) => {
+      subscriber.next({ data: this.formatChunk(res) });
+      subscriber.next({ data: 'FINISH' });
+      subscriber.complete();
+    });
+  }
+
   private formatChunk(chunk: Response) {
+    const sources: {
+      score: number;
+      text: string;
+      metadata: Record<string, any>;
+    }[] = [];
+    if (chunk.sourceNodes) {
+      for (const source of chunk.sourceNodes) {
+        if (source.node.metadata?.isInternal) {
+          continue;
+        }
+
+        sources.push({
+          score: source.score,
+          text: (source.node as TextNode).text,
+          metadata: source.node.metadata,
+        });
+      }
+    }
+
     return {
       ...chunk,
-      sourceNodes: chunk.sourceNodes
-        ? chunk.sourceNodes.map((n) => ({
-            score: n.score,
-            text: (n.node as TextNode).text,
-            metadata: n.node.metadata,
-          }))
-        : null,
+      sourceNodes: sources.length === 0 ? null : sources,
     };
   }
 
