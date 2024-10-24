@@ -149,10 +149,7 @@ export class ChatService {
       }),
     );
 
-    let routerResult: 'author' | 'summary' | 'content' | null = null;
-    if (bookSlug === 'ihya-culum-din') {
-      routerResult = await this.routeQuery(chatHistory, body.question);
-    }
+    const routerResult = await this.routeQuery(chatHistory, body.question);
 
     if (routerResult === 'author') {
       const bookDetails = await this.cache.fetch(bookSlug);
