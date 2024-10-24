@@ -7,6 +7,6 @@ export const setLlamaindexSettings = (_mode: 'DEV' | 'PROD' = 'PROD') => {
   Settings.chunkSize = 1024;
   Settings.chunkOverlap = 20;
 
-  Settings.llm = createAzureOpenAI();
+  Settings.llm = createAzureOpenAI({ enableHelicone: true });
   Settings.embedModel = createAzureOpenAIEmbeddings();
 };

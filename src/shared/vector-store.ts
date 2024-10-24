@@ -38,7 +38,7 @@ export const createVectorStoreIndex = async (mode: 'DEV' | 'PROD' = 'PROD') => {
     createVectorStore(mode),
     serviceContextFromDefaults({
       embedModel: createAzureOpenAIEmbeddings(),
-      llm: createAzureOpenAI(),
+      llm: createAzureOpenAI({ enableHelicone: true }),
     }),
   );
 

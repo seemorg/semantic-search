@@ -25,8 +25,15 @@ export class ChatService {
   constructor(private readonly usulService: UsulService) {}
 
   private readonly vectorStoreIndex = createVectorStoreIndex();
-  private readonly routingLlm = createAzureOpenAI({ temperature: 0 });
-  private readonly llm = createAzureOpenAI({ temperature: 0.5 });
+  private readonly routingLlm = createAzureOpenAI({
+    temperature: 0,
+    enableHelicone: true,
+  });
+  private readonly llm = createAzureOpenAI({
+    temperature: 0.5,
+    enableHelicone: true,
+  });
+
   private readonly cache = new LRUCache<string, UsulBookDetailsResponse>({
     max: 500,
     fetchMethod: async (key) => {
