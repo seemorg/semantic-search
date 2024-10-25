@@ -38,7 +38,10 @@ export const createVectorStoreIndex = async (mode: 'DEV' | 'PROD' = 'PROD') => {
     createVectorStore(mode),
     serviceContextFromDefaults({
       embedModel: createAzureOpenAIEmbeddings(),
-      llm: createAzureOpenAI({ enableHelicone: true }),
+      llm: createAzureOpenAI({
+        enableTracing: true,
+        tracingName: 'Chat.OpenAI.RAG',
+      }),
     }),
   );
 

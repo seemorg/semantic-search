@@ -1,37 +1,37 @@
 import { OpenAI, OpenAIEmbedding } from 'llamaindex';
+import { observeOpenAI } from './langfuse/openai';
 
 // gpt-4o
 export const createAzureOpenAI = ({
   temperature = 0,
-  enableHelicone,
+  enableTracing,
+  tracingName,
   ...config
-}: Partial<OpenAI> & { enableHelicone?: boolean } = {}) => {
-  if (!enableHelicone) {
-    return new OpenAI({
-      azure: {
-        apiKey: process.env.AZURE_SECRET_KEY,
-        endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
-        deploymentName: process.env.AZURE_LLM_DEPLOYMENT_NAME,
-      },
-      temperature,
-      ...config,
-    });
-  }
-
-  return new OpenAI({
-    additionalSessionOptions: {
-      baseURL: `https://oai.helicone.ai/openai/deployments/${process.env.AZURE_LLM_DEPLOYMENT_NAME}`,
-      defaultHeaders: {
-        'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
-        'Helicone-OpenAI-Api-Base': `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
-        'api-key': process.env.AZURE_SECRET_KEY,
-      },
-      defaultQuery: {
-        'api-version': '2024-08-01-preview',
-      },
+}: Partial<OpenAI> & {
+  enableTracing?: boolean;
+  tracingName?: string;
+} = {}) => {
+  const client = new OpenAI({
+    azure: {
+      apiKey: process.env.AZURE_SECRET_KEY,
+      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
+      deploymentName: process.env.AZURE_LLM_DEPLOYMENT_NAME,
     },
     temperature,
     ...config,
+  });
+
+  if (!enableTracing) {
+    return client;
+  }
+
+  return observeOpenAI(client, {
+    generationName: tracingName,
+    clientInitParams: {
+      secretKey: process.env.LANGFUSE_SECRET_KEY,
+      publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+      baseUrl: 'https://us.cloud.langfuse.com',
+    },
   });
 };
 

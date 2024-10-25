@@ -7,6 +7,9 @@ export const setLlamaindexSettings = (_mode: 'DEV' | 'PROD' = 'PROD') => {
   Settings.chunkSize = 1024;
   Settings.chunkOverlap = 20;
 
-  Settings.llm = createAzureOpenAI({ enableHelicone: true });
+  Settings.llm = createAzureOpenAI({
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.Global',
+  });
   Settings.embedModel = createAzureOpenAIEmbeddings();
 };

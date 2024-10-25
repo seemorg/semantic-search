@@ -19,9 +19,6 @@ export class EnvironmentVariables {
   QDRANT_COLLECTION: string;
 
   @IsString()
-  HELICONE_API_KEY: string;
-
-  @IsString()
   AZURE_EMBEDDINGS_DEPLOYMENT_NAME: string;
 
   @IsString()

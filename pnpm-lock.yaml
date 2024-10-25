@@ -68,6 +68,12 @@ importers:
       langchain:
         specifier: ^0.2.2
         version: 0.2.2(@notionhq/client@2.2.15(encoding@0.1.13))(@pinecone-database/pinecone@2.2.1)(assemblyai@4.5.0)(axios@1.7.2)(chromadb@1.8.1(@google/generative-ai@0.12.0)(cohere-ai@7.9.5(encoding@0.1.13))(encoding@0.1.13)(openai@4.51.0(encoding@0.1.13)))(encoding@0.1.13)(html-to-text@9.0.5)(ignore@5.3.1)(mammoth@1.8.0)(mongodb@6.7.0)(openai@4.51.0(encoding@0.1.13))(ws@8.17.1)
+      langfuse:
+        specifier: ^3.27.2
+        version: 3.27.2
+      langfuse-core:
+        specifier: ^3.28.0
+        version: 3.28.0
       llamaindex:
         specifier: ^0.3.17
         version: 0.3.17(@notionhq/client@2.2.15(encoding@0.1.13))(encoding@0.1.13)(node-fetch@3.3.2)(typescript@5.4.5)
@@ -3431,6 +3437,14 @@ packages:
 
   langchainhub@0.0.11:
     resolution: {integrity: sha512-WnKI4g9kU2bHQP136orXr2bcRdgz9iiTBpTN0jWt9IlScUKnJBoD0aa2HOzHURQKeQDnt2JwqVmQ6Depf5uDLQ==}
+
+  langfuse-core@3.28.0:
+    resolution: {integrity: sha512-RLx7Bkd9nSGiCLQYDLknGfTljKNUr9R7h4w2Y6+k6ryK26QSA7Te3hJEvyEuvDyopRk+8rvUuqF5I2N9ama9Xw==}
+    engines: {node: '>=18'}
+
+  langfuse@3.27.2:
+    resolution: {integrity: sha512-JFu5H+Fq/gVGqX1tw7vZn4DClCKwsP/6zqP3Ir45TwKSii43JckEMQK8X+/2Dhxct+XXbZeB+7/M+XmoObhKvA==}
+    engines: {node: '>=18'}
 
   langsmith@0.1.28:
     resolution: {integrity: sha512-IQUbo7I7rEE6QYBhrcgwqvlkcUsHlia0yTQpDwWdITw/VJx1f7gLPjNdbwWE+jvOZ4HcD7gCf2HR6zFXputu5A==}
@@ -8572,6 +8586,14 @@ snapshots:
       - openai
 
   langchainhub@0.0.11: {}
+
+  langfuse-core@3.28.0:
+    dependencies:
+      mustache: 4.2.0
+
+  langfuse@3.27.2:
+    dependencies:
+      langfuse-core: 3.28.0
 
   langsmith@0.1.28(@langchain/core@0.2.7(langchain@0.2.2(@notionhq/client@2.2.15(encoding@0.1.13))(@pinecone-database/pinecone@2.2.1)(assemblyai@4.5.0)(axios@1.7.2)(chromadb@1.8.1(@google/generative-ai@0.12.0)(cohere-ai@7.9.5(encoding@0.1.13))(encoding@0.1.13)(openai@4.51.0(encoding@0.1.13)))(encoding@0.1.13)(html-to-text@9.0.5)(ignore@5.3.1)(mammoth@1.8.0)(mongodb@6.7.0)(openai@4.51.0(encoding@0.1.13))(ws@8.17.1))(openai@4.51.0(encoding@0.1.13)))(langchain@0.2.2(@notionhq/client@2.2.15(encoding@0.1.13))(@pinecone-database/pinecone@2.2.1)(assemblyai@4.5.0)(axios@1.7.2)(chromadb@1.8.1(@google/generative-ai@0.12.0)(cohere-ai@7.9.5(encoding@0.1.13))(encoding@0.1.13)(openai@4.51.0(encoding@0.1.13)))(encoding@0.1.13)(html-to-text@9.0.5)(ignore@5.3.1)(mammoth@1.8.0)(mongodb@6.7.0)(openai@4.51.0(encoding@0.1.13))(ws@8.17.1))(openai@4.51.0(encoding@0.1.13)):
     dependencies:

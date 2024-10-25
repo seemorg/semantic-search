@@ -27,11 +27,14 @@ export class ChatService {
   private readonly vectorStoreIndex = createVectorStoreIndex();
   private readonly routingLlm = createAzureOpenAI({
     temperature: 0,
-    enableHelicone: true,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.Router',
   });
+
   private readonly llm = createAzureOpenAI({
     temperature: 0.5,
-    enableHelicone: true,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.NonRAG',
   });
 
   private readonly cache = new LRUCache<string, UsulBookDetailsResponse>({
@@ -49,6 +52,8 @@ export class ChatService {
   private readonly retryServiceContext = serviceContextFromDefaults({
     llm: createAzureOpenAI({
       temperature: 0.3,
+      enableTracing: true,
+      tracingName: 'Chat.OpenAI.RAG.Retry',
     }),
   });
 
