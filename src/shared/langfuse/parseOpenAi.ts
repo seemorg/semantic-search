@@ -99,6 +99,10 @@ export const parseInputArgs = (
 };
 
 export const parseCompletionOutput = (res: ChatResponse): string => {
+  if ('text' in res) {
+    return res.text as string;
+  }
+
   if (!res.message?.content) {
     return '';
   }
@@ -109,6 +113,36 @@ export const parseCompletionOutput = (res: ChatResponse): string => {
         .join(' ')
     : res.message.content;
 };
+
+type OpenAIUsage = {
+  completion_tokens: number;
+  prompt_tokens: number;
+  total_tokens: number;
+};
+
+export const parseUsage = (res: ChatResponse) => {
+  if (hasCompletionUsage(res.raw)) {
+    const { prompt_tokens, completion_tokens, total_tokens } = res.raw.usage;
+
+    return {
+      promptTokens: prompt_tokens,
+      completionTokens: completion_tokens,
+      totalTokens: total_tokens,
+    };
+  }
+};
+
+// Type guard to check if an unknown object is a UsageResponse
+function hasCompletionUsage(obj: any): obj is { usage: OpenAIUsage } {
+  return (
+    obj instanceof Object &&
+    'usage' in obj &&
+    obj.usage instanceof Object &&
+    typeof obj.usage.prompt_tokens === 'number' &&
+    typeof obj.usage.completion_tokens === 'number' &&
+    typeof obj.usage.total_tokens === 'number'
+  );
+}
 
 export const parseChunk = (
   rawChunk: ChatResponseChunk<ToolCallLLMMessageOptions>,

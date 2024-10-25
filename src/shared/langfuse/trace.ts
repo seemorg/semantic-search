@@ -13,6 +13,7 @@ import {
   parseChunk,
   parseCompletionOutput,
   parseInputArgs,
+  parseUsage,
 } from './parseOpenAi';
 import { isAsyncIterable } from './utils';
 import type {
@@ -142,12 +143,14 @@ const wrapMethod = async <T extends GenericMethod>(
       return tracedOutputGenerator() as ReturnType<T>;
     }
 
+    const usage = parseUsage(res as ChatResponse);
     const output = parseCompletionOutput(res as ChatResponse);
 
     langfuseParent.generation({
       ...observationData,
       output,
       endTime: new Date(),
+      usage,
     });
 
     if (!hasUserProvidedParent) {
