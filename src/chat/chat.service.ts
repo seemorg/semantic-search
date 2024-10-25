@@ -1,94 +1,52 @@
-import {
-  CondenseQuestionChatEngine,
-  ChatMessage,
-  TextNode,
-  Response,
-  serviceContextFromDefaults,
-  ChatResponseChunk,
-  ToolCallLLMMessageOptions,
-} from 'llamaindex';
-import { Injectable, MessageEvent } from '@nestjs/common';
+import type { ChatMessage } from 'llamaindex';
+import { Injectable } from '@nestjs/common';
 import { ChatDto } from './dto/chat.dto';
-import { Observable } from 'rxjs';
 import { FeedbackDto } from './dto/feedback.dto';
 import { createVectorStoreIndex } from 'src/shared/vector-store';
 import { createAzureOpenAI } from 'src/shared/azure-openai';
-import { ROUTER_PROMPT } from './prompts/router.prompt';
 import { makeAuthorPrompt } from './prompts/author.prompt';
 import { makeBookPrompt } from './prompts/book.prompt';
 import { UsulService } from '../usul/usul.service';
-import { LRUCache } from 'lru-cache';
 import { UsulBookDetailsResponse } from 'src/types/usul';
+import { CondenseService } from './condense.service';
+import { makeRagMessages } from './prompts/rag.prompt';
+import { ChatRouterService } from './router.service';
+import { ChatFormatterService } from './format.service';
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly usulService: UsulService) {}
+  constructor(
+    private readonly usulService: UsulService,
+    private readonly condenseService: CondenseService,
+    private readonly routerService: ChatRouterService,
+    private readonly formatterService: ChatFormatterService,
+  ) {}
 
   private readonly vectorStoreIndex = createVectorStoreIndex();
-  private readonly routingLlm = createAzureOpenAI({
-    temperature: 0,
-    enableTracing: true,
-    tracingName: 'Chat.OpenAI.Router',
-  });
 
-  private readonly llm = createAzureOpenAI({
+  private readonly authorLlm = createAzureOpenAI({
     temperature: 0.5,
     enableTracing: true,
-    tracingName: 'Chat.OpenAI.NonRAG',
+    tracingName: 'Chat.OpenAI.NonRAG.Author',
   });
 
-  private readonly cache = new LRUCache<string, UsulBookDetailsResponse>({
-    max: 500,
-    fetchMethod: async (key) => {
-      const book = await this.usulService.getBookDetails(key);
-      if (!book) {
-        return;
-      }
-
-      return book;
-    },
+  private readonly bookLlm = createAzureOpenAI({
+    temperature: 0.5,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.NonRAG.Book',
   });
 
-  private readonly retryServiceContext = serviceContextFromDefaults({
-    llm: createAzureOpenAI({
-      temperature: 0.3,
-      enableTracing: true,
-      tracingName: 'Chat.OpenAI.RAG.Retry',
-    }),
+  private readonly ragLlm = createAzureOpenAI({
+    temperature: 0.5,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.RAG',
   });
 
-  async routeQuery(history: ChatMessage[], query: string) {
-    const response = await this.routingLlm.chat({
-      additionalChatOptions: {
-        response_format: { type: 'json_object' },
-      },
-      messages: [
-        {
-          role: 'system',
-          content: ROUTER_PROMPT,
-        },
-        ...history,
-        {
-          role: 'user',
-          content: query,
-        },
-      ],
-    });
-
-    if (!response.message?.content) {
-      return 'content';
-    }
-
-    const intent = JSON.parse(response.message.content as string) as {
-      intent: 'A' | 'B' | 'C';
-    };
-
-    const parsedIntent = ({ A: 'author', B: 'summary', C: 'content' } as const)[
-      intent.intent
-    ];
-
-    return parsedIntent;
-  }
+  private readonly retryRagLlm = createAzureOpenAI({
+    temperature: 0.5,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.RAG.Retry',
+  });
 
   async answerAuthorQuery({
     bookDetails,
@@ -99,7 +57,7 @@ export class ChatService {
     history: ChatMessage[];
     query: string;
   }) {
-    const response = await this.llm.chat({
+    const response = await this.authorLlm.chat({
       stream: true,
       messages: [
         {
@@ -123,7 +81,7 @@ export class ChatService {
     history: ChatMessage[];
     query: string;
   }) {
-    const response = await this.llm.chat({
+    const response = await this.bookLlm.chat({
       stream: true,
       messages: [
         {
@@ -138,11 +96,15 @@ export class ChatService {
     return response;
   }
 
-  async getQueryEngine(bookSlug: string) {
+  async retrieveSources(bookSlug: string, query: string) {
     const index = await this.vectorStoreIndex;
 
-    const queryEngine = index.asQueryEngine({
+    const retriever = index.asRetriever({
       similarityTopK: 5,
+    });
+
+    return retriever.retrieve({
+      query,
       preFilters: {
         filters: [
           {
@@ -153,8 +115,6 @@ export class ChatService {
         ],
       },
     });
-
-    return queryEngine;
   }
 
   async chatWithBook(bookSlug: string, body: ChatDto) {
@@ -165,11 +125,14 @@ export class ChatService {
       }),
     );
 
-    const routerResult = await this.routeQuery(chatHistory, body.question);
+    const routerResult = await this.routerService.routeQuery(
+      chatHistory,
+      body.question,
+    );
+    const bookDetails = await this.usulService.getBookDetails(bookSlug);
 
     if (routerResult === 'author') {
-      const bookDetails = await this.cache.fetch(bookSlug);
-      return this.asyncChatResponseChunkToObservable(
+      return this.formatterService.chatIterableToObservable(
         await this.answerAuthorQuery({
           bookDetails,
           history: chatHistory,
@@ -179,8 +142,7 @@ export class ChatService {
     }
 
     if (routerResult === 'summary') {
-      const bookDetails = await this.cache.fetch(bookSlug);
-      return this.asyncChatResponseChunkToObservable(
+      return this.formatterService.chatIterableToObservable(
         await this.answerSummaryQuery({
           bookDetails,
           history: chatHistory,
@@ -189,112 +151,34 @@ export class ChatService {
       );
     }
 
-    const queryEngine = await this.getQueryEngine(bookSlug);
+    const llmToUse = body.isRetry === 'true' ? this.retryRagLlm : this.ragLlm;
 
-    // If there are no messages, don't use CondenseQuestionChatEngine
+    let ragQuery: string;
+    // If there are no messages, don't condense the history
     if (chatHistory.length === 0) {
-      return this.asyncIteratorToObservable(
-        await queryEngine.query({
-          stream: true,
-          query: body.question,
-        }),
-      );
+      ragQuery = body.question;
+    } else {
+      ragQuery = await this.condenseService.condenseMessageHistory({
+        chatHistory,
+        query: body.question,
+        isRetry: body.isRetry === 'true',
+      });
     }
 
-    const chatEngine = new CondenseQuestionChatEngine({
-      queryEngine,
-      chatHistory,
-      ...(body.isRetry === 'true'
-        ? { serviceContext: this.retryServiceContext }
-        : {}),
-      condenseMessagePrompt({ chatHistory, question }) {
-        return `Given a conversation (between Human and Assistant) and a follow up message from Human, rewrite the message to be a standalone question that captures all relevant context from the conversation. The standalone question must be in the same language as the user input.
+    const sources = await this.retrieveSources(bookSlug, ragQuery);
 
-        <Chat History>
-        ${chatHistory}
-
-        <Follow Up Message>
-        ${question}
-
-        <Standalone question>
-        `;
-      },
-    });
-
-    return this.asyncIteratorToObservable(
-      await chatEngine.chat({
-        message: body.question,
+    return this.formatterService.chatIterableToObservable(
+      await llmToUse.chat({
         stream: true,
+        messages: makeRagMessages({
+          response: bookDetails,
+          history: chatHistory,
+          query: body.question,
+          sources,
+        }),
       }),
+      sources,
     );
-  }
-
-  private asyncIteratorToObservable(iterator: AsyncIterable<Response>) {
-    return new Observable<MessageEvent>((subscriber) => {
-      (async () => {
-        for await (const chunk of iterator) {
-          subscriber.next({ data: this.formatChunk(chunk) });
-        }
-
-        subscriber.next({ data: 'FINISH' });
-        subscriber.complete();
-      })();
-    });
-  }
-
-  private asyncChatResponseChunkToObservable(
-    iterator: AsyncIterable<ChatResponseChunk<ToolCallLLMMessageOptions>>,
-  ) {
-    return new Observable<MessageEvent>((subscriber) => {
-      (async () => {
-        for await (const chunk of iterator) {
-          subscriber.next({
-            data: {
-              response: chunk.delta,
-              sourceNodes: null,
-              metadata: {},
-            },
-          });
-        }
-
-        subscriber.next({ data: 'FINISH' });
-        subscriber.complete();
-      })();
-    });
-  }
-
-  private finalResponseToObservable(res: Response) {
-    return new Observable<MessageEvent>((subscriber) => {
-      subscriber.next({ data: this.formatChunk(res) });
-      subscriber.next({ data: 'FINISH' });
-      subscriber.complete();
-    });
-  }
-
-  private formatChunk(chunk: Response) {
-    const sources: {
-      score: number;
-      text: string;
-      metadata: Record<string, any>;
-    }[] = [];
-    if (chunk.sourceNodes) {
-      for (const source of chunk.sourceNodes) {
-        if (source.node.metadata?.isInternal) {
-          continue;
-        }
-
-        sources.push({
-          score: source.score,
-          text: (source.node as TextNode).text,
-          metadata: source.node.metadata,
-        });
-      }
-    }
-
-    return {
-      ...chunk,
-      sourceNodes: sources.length === 0 ? null : sources,
-    };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
