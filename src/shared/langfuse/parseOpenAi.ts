@@ -87,6 +87,8 @@ export const parseInputArgs = (
     if ('tool_choice' in args) {
       input.tool_choice = args.tool_choice;
     }
+  } else if ('prompt' in args) {
+    input = args.prompt;
   }
 
   return {
@@ -97,7 +99,7 @@ export const parseInputArgs = (
 };
 
 export const parseCompletionOutput = (res: ChatResponse): string => {
-  if (!res.message.content) {
+  if (!res.message?.content) {
     return '';
   }
 
@@ -119,14 +121,17 @@ export const parseChunk = (
   let isToolCall = false;
 
   try {
-    if ('delta' in rawChunk && 'toolCall' in rawChunk.options) {
+    if (rawChunk.options && 'toolCall' in rawChunk.options) {
       isToolCall = true;
-
       return { isToolCall, data: rawChunk.options.toolCall[0] };
     }
 
     if ('delta' in rawChunk) {
       return { isToolCall, data: rawChunk.delta || '' };
+    }
+
+    if ('text' in rawChunk) {
+      return { isToolCall, data: (rawChunk as any).text || '' };
     }
   } catch (e) {}
 

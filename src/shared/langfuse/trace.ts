@@ -4,6 +4,7 @@ import type {
   OpenAI,
   PartialToolCall,
   ToolCall,
+  ToolCallLLMMessageOptions,
 } from 'llamaindex';
 
 import { LangfuseSingleton } from './singleton';
@@ -103,10 +104,12 @@ const wrapMethod = async <T extends GenericMethod>(
         const toolCallChunks: (ToolCall | PartialToolCall)[] = [];
         let completionStartTime: Date | null = null;
 
-        for await (const rawChunk of response as AsyncIterable<unknown>) {
+        for await (const rawChunk of response as AsyncIterable<
+          ChatResponseChunk<ToolCallLLMMessageOptions>
+        >) {
           completionStartTime = completionStartTime ?? new Date();
 
-          const processedChunk = parseChunk(rawChunk as ChatResponseChunk);
+          const processedChunk = parseChunk(rawChunk);
 
           if (!processedChunk.isToolCall) {
             textChunks.push(processedChunk.data as string);

@@ -75,6 +75,10 @@ export class ChatService {
       ],
     });
 
+    if (!response.message?.content) {
+      return 'content';
+    }
+
     const intent = JSON.parse(response.message.content as string) as {
       intent: 'A' | 'B' | 'C';
     };
