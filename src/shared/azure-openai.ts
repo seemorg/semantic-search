@@ -1,15 +1,18 @@
 import { OpenAI, OpenAIEmbedding } from 'llamaindex';
 import { observeOpenAI } from './langfuse/openai';
+import { LangfusePromptClient } from 'langfuse';
 
 // gpt-4o
 export const createAzureOpenAI = ({
   temperature = 0,
   enableTracing,
   tracingName,
+  langfusePrompt,
   ...config
 }: Partial<OpenAI> & {
   enableTracing?: boolean;
   tracingName?: string;
+  langfusePrompt?: LangfusePromptClient;
 } = {}) => {
   const client = new OpenAI({
     azure: {
@@ -32,6 +35,7 @@ export const createAzureOpenAI = ({
       publicKey: process.env.LANGFUSE_PUBLIC_KEY,
       baseUrl: 'https://us.cloud.langfuse.com',
     },
+    langfusePrompt,
   });
 };
 

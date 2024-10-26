@@ -1,4 +1,4 @@
-import { LangfuseSingleton } from './singleton';
+import { langfuse } from './singleton';
 import { withTracing } from './trace';
 import type { LangfuseCore } from 'langfuse-core';
 import { LangfuseConfig, LangfuseExtension } from './types';
@@ -49,7 +49,7 @@ export const observeOpenAI = <SDKType extends object>(
         if (langfuseConfig && 'parent' in langfuseConfig) {
           langfuseClient = langfuseConfig.parent.client;
         } else {
-          langfuseClient = LangfuseSingleton.getInstance();
+          langfuseClient = langfuse;
         }
 
         return langfuseClient.flushAsync.bind(langfuseClient);

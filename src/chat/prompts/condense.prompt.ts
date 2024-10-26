@@ -1,27 +1,49 @@
+import { Injectable } from '@nestjs/common';
+import { createAzureOpenAI } from '../../shared/azure-openai';
 import { ChatMessage } from 'llamaindex';
+import { langfuse } from 'src/shared/langfuse/singleton';
 
-export const makeCondenseMessageHistoryPrompt = ({
-  chatHistory,
-  query,
-}: {
-  chatHistory: ChatMessage[];
-  query: string;
-}): ChatMessage[] => {
-  return [
-    {
-      role: 'system',
-      content:
-        'Given a conversation (between Human and Assistant) and a follow up message from Human, rewrite the message to be a standalone question that captures all relevant context from the conversation. The standalone question must be in the same language as the user input.',
-    },
-    {
-      role: 'user',
-      content: `
-Chat History:
-${chatHistory.map((m) => `${m.role === 'user' ? 'Human' : 'Assistant'}`).join('\n')}
+@Injectable()
+export class CondenseService {
+  private readonly llm = createAzureOpenAI({
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.RAG.Condense',
+  });
 
-Follow Up Message:
-${query}
-      `.trim(),
-    },
-  ];
-};
+  private readonly retryLlm = createAzureOpenAI({
+    temperature: 0.3,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.RAG.Condense.Retry',
+  });
+
+  private getPrompt() {
+    return langfuse.getPrompt('rag.condense', undefined, { type: 'chat' });
+  }
+
+  async condenseMessageHistory({
+    chatHistory,
+    query,
+    isRetry,
+  }: {
+    chatHistory: ChatMessage[];
+    query: string;
+    isRetry?: boolean;
+  }) {
+    const llmToUse = isRetry ? this.retryLlm : this.llm;
+    const prompt = await this.getPrompt();
+
+    const compiledPrompt = prompt.compile({
+      chatHistory: chatHistory
+        .map((m) => `${m.role === 'user' ? 'Human' : 'Assistant'}`)
+        .join('\n'),
+      query,
+    }) as ChatMessage[];
+
+    const response = await llmToUse.chat({
+      langfusePrompt: prompt,
+      messages: compiledPrompt,
+    });
+
+    return response.message.content as string;
+  }
+}

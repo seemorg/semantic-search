@@ -9,7 +9,7 @@ import type {
 } from 'langfuse-core';
 import type { OpenAI } from 'llamaindex';
 
-import type { LangfuseSingleton } from './singleton';
+import type { langfuse } from './singleton';
 
 export type LangfuseInitParams = {
   publicKey?: string;
@@ -45,5 +45,4 @@ export type LangfuseConfig = (
   langfusePrompt?: LangfusePromptClient;
 };
 
-export type LangfuseExtension = OpenAI &
-  Pick<ReturnType<(typeof LangfuseSingleton)['getInstance']>, 'flushAsync'>;
+export type LangfuseExtension = OpenAI & Pick<typeof langfuse, 'flushAsync'>;

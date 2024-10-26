@@ -7,7 +7,7 @@ import type {
   ToolCallLLMMessageOptions,
 } from 'llamaindex';
 
-import { LangfuseSingleton } from './singleton';
+import { langfuse } from './singleton';
 import {
   getToolCallOutput,
   parseChunk,
@@ -38,7 +38,7 @@ const wrapMethod = async <T extends GenericMethod>(
   config?: LangfuseConfig,
   ...args: Parameters<T>
 ): Promise<ReturnType<T> | any> => {
-  const { model, input, modelParameters } = parseInputArgs(
+  const { model, input, modelParameters, extra } = parseInputArgs(
     args[0] ?? ({} as any),
     sdk,
   );
@@ -52,14 +52,17 @@ const wrapMethod = async <T extends GenericMethod>(
         : undefined,
   };
 
+  const promptName = extra?.promptName ?? config?.langfusePrompt?.name;
+  const promptVersion = extra?.promptVersion ?? config?.langfusePrompt?.version;
+
   let observationData = {
     model,
     input,
     modelParameters: finalModelParams,
     name: config?.generationName,
     startTime: new Date(),
-    promptName: config?.langfusePrompt?.name,
-    promptVersion: config?.langfusePrompt?.version,
+    promptName,
+    promptVersion,
     metadata: finalMetadata,
   };
 
@@ -75,13 +78,10 @@ const wrapMethod = async <T extends GenericMethod>(
     observationData = {
       ...filteredConfig,
       ...observationData,
-      promptName: config?.promptName ?? config?.langfusePrompt?.name, // Maintain backward compatibility for users who use promptName
-      promptVersion: config?.promptVersion ?? config?.langfusePrompt?.version, // Maintain backward compatibility for users who use promptVersion
+      promptName,
+      promptVersion,
     };
   } else {
-    const langfuse = LangfuseSingleton.getInstance(
-      (config as LangfuseNewTraceConfig)?.clientInitParams,
-    );
     langfuseParent = langfuse.trace({
       ...config,
       ...observationData,

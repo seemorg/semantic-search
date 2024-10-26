@@ -1,24 +1,64 @@
 import { UsulBookDetailsResponse } from '../../types/usul';
 
-export const makeBookPrompt = (response: UsulBookDetailsResponse) => {
-  const book = response.book;
-  const headings = response.headings;
+import { Injectable } from '@nestjs/common';
+import { langfuse } from '../../shared/langfuse/singleton';
+import { createAzureOpenAI } from '../../shared/azure-openai';
+import { ChatMessage } from 'llamaindex';
 
-  return `
-Given the following information about a book, answer the question. Feel free to use knowledge you have not explicity outlined below:
+@Injectable()
+export class BookSummaryChatService {
+  private llm = createAzureOpenAI({
+    temperature: 0.5,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.NonRAG.Book',
+  });
 
-- Primary Name: ${book.primaryName}
-- Transliteration: ${book.transliteration}  
-${book.secondaryName ? `- Secondary Name: ${book.secondaryName}` : ''} 
-- Slug: ${book.slug}  
-- Number of Versions: ${book.numberOfVersions}
-- Versions:
-${book.versions.map((v) => `  * Value: ${v.value}, Source: ${v.source}`).join('\n')} 
-- Genres:  
-${book.genres.map((g) => `  * Name: ${g.name}, Secondary Name: ${g.secondaryName}`).join('\n')} 
+  private getPrompt() {
+    return langfuse.getPrompt('non-rag.book');
+  }
 
+  async answerQuery({
+    bookDetails,
+    history,
+    query,
+  }: {
+    bookDetails: UsulBookDetailsResponse;
+    history: ChatMessage[];
+    query: string;
+  }) {
+    const prompt = await this.getPrompt();
+    const book = bookDetails.book;
 
-Table of content:
-${headings.map((h, idx) => `${idx + 1}. ${h.title}`).join('\n')}
-`.trim();
-};
+    const compiledPrompt = prompt.compile({
+      primaryName: book.primaryName,
+      transliteration: book.transliteration,
+      secondaryName: book.secondaryName ?? '-',
+      slug: book.slug,
+      numberOfVersions: book.numberOfVersions.toString(),
+      versions: book.versions
+        .map((v) => `  * Value: ${v.value}, Source: ${v.source}`)
+        .join('\n'),
+      genres: book.genres
+        .map((g) => `  * Name: ${g.name}, Secondary Name: ${g.secondaryName}`)
+        .join('\n'),
+      tableOfContent: bookDetails.headings
+        .map((h, idx) => `${idx + 1}. ${h.title}`)
+        .join('\n'),
+    });
+
+    const response = await this.llm.chat({
+      langfusePrompt: prompt,
+      stream: true,
+      messages: [
+        {
+          role: 'system',
+          content: compiledPrompt,
+        },
+        ...history,
+        { role: 'user', content: query },
+      ],
+    });
+
+    return response;
+  }
+}

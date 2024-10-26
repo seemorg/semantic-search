@@ -3,14 +3,12 @@ import { Injectable } from '@nestjs/common';
 import { ChatDto } from './dto/chat.dto';
 import { FeedbackDto } from './dto/feedback.dto';
 import { createVectorStoreIndex } from 'src/shared/vector-store';
-import { createAzureOpenAI } from 'src/shared/azure-openai';
-import { makeAuthorPrompt } from './prompts/author.prompt';
-import { makeBookPrompt } from './prompts/book.prompt';
+import { AuthorChatService } from './prompts/author.prompt';
+import { BookSummaryChatService } from './prompts/book.prompt';
 import { UsulService } from '../usul/usul.service';
-import { UsulBookDetailsResponse } from 'src/types/usul';
-import { CondenseService } from './condense.service';
-import { makeRagMessages } from './prompts/rag.prompt';
-import { ChatRouterService } from './router.service';
+import { CondenseService } from './prompts/condense.prompt';
+import { RagChatService } from './prompts/rag.prompt';
+import { ChatRouterService } from './prompts/router.prompt';
 import { ChatFormatterService } from './format.service';
 
 @Injectable()
@@ -20,81 +18,12 @@ export class ChatService {
     private readonly condenseService: CondenseService,
     private readonly routerService: ChatRouterService,
     private readonly formatterService: ChatFormatterService,
+    private readonly authorService: AuthorChatService,
+    private readonly bookService: BookSummaryChatService,
+    private readonly ragService: RagChatService,
   ) {}
 
   private readonly vectorStoreIndex = createVectorStoreIndex();
-
-  private readonly authorLlm = createAzureOpenAI({
-    temperature: 0.5,
-    enableTracing: true,
-    tracingName: 'Chat.OpenAI.NonRAG.Author',
-  });
-
-  private readonly bookLlm = createAzureOpenAI({
-    temperature: 0.5,
-    enableTracing: true,
-    tracingName: 'Chat.OpenAI.NonRAG.Book',
-  });
-
-  private readonly ragLlm = createAzureOpenAI({
-    temperature: 0.5,
-    enableTracing: true,
-    tracingName: 'Chat.OpenAI.RAG',
-  });
-
-  private readonly retryRagLlm = createAzureOpenAI({
-    temperature: 0.5,
-    enableTracing: true,
-    tracingName: 'Chat.OpenAI.RAG.Retry',
-  });
-
-  async answerAuthorQuery({
-    bookDetails,
-    history,
-    query,
-  }: {
-    bookDetails: UsulBookDetailsResponse;
-    history: ChatMessage[];
-    query: string;
-  }) {
-    const response = await this.authorLlm.chat({
-      stream: true,
-      messages: [
-        {
-          role: 'system',
-          content: makeAuthorPrompt(bookDetails),
-        },
-        ...history,
-        { role: 'user', content: query },
-      ],
-    });
-
-    return response;
-  }
-
-  async answerSummaryQuery({
-    bookDetails,
-    history,
-    query,
-  }: {
-    bookDetails: UsulBookDetailsResponse;
-    history: ChatMessage[];
-    query: string;
-  }) {
-    const response = await this.bookLlm.chat({
-      stream: true,
-      messages: [
-        {
-          role: 'system',
-          content: makeBookPrompt(bookDetails),
-        },
-        ...history,
-        { role: 'user', content: query },
-      ],
-    });
-
-    return response;
-  }
 
   async retrieveSources(bookSlug: string, query: string) {
     const index = await this.vectorStoreIndex;
@@ -133,7 +62,7 @@ export class ChatService {
 
     if (routerResult === 'author') {
       return this.formatterService.chatIterableToObservable(
-        await this.answerAuthorQuery({
+        await this.authorService.answerQuery({
           bookDetails,
           history: chatHistory,
           query: body.question,
@@ -143,15 +72,13 @@ export class ChatService {
 
     if (routerResult === 'summary') {
       return this.formatterService.chatIterableToObservable(
-        await this.answerSummaryQuery({
+        await this.bookService.answerQuery({
           bookDetails,
           history: chatHistory,
           query: body.question,
         }),
       );
     }
-
-    const llmToUse = body.isRetry === 'true' ? this.retryRagLlm : this.ragLlm;
 
     let ragQuery: string;
     // If there are no messages, don't condense the history
@@ -168,14 +95,12 @@ export class ChatService {
     const sources = await this.retrieveSources(bookSlug, ragQuery);
 
     return this.formatterService.chatIterableToObservable(
-      await llmToUse.chat({
-        stream: true,
-        messages: makeRagMessages({
-          response: bookDetails,
-          history: chatHistory,
-          query: body.question,
-          sources,
-        }),
+      await this.ragService.answerQuery({
+        bookDetails,
+        history: chatHistory,
+        query: ragQuery,
+        sources,
+        isRetry: body.isRetry === 'true',
       }),
       sources,
     );

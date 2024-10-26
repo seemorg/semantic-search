@@ -1,13 +1,54 @@
-export const ROUTER_PROMPT = `
-Given a message from the user about a book, determine what the message is about:
+import { Injectable } from '@nestjs/common';
+import { ChatMessage } from 'llamaindex';
+import { createAzureOpenAI } from 'src/shared/azure-openai';
+import { langfuse } from '../../shared/langfuse/singleton';
 
-A: The Author
-B: Summary, Book Metadata, or Table of Content 
-C: Content inside the book
+@Injectable()
+export class ChatRouterService {
+  private readonly llm = createAzureOpenAI({
+    temperature: 0,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.Router',
+  });
 
-Return a json with using just the letter capitalized in the following format: 
+  private getPrompt() {
+    return langfuse.getPrompt('router');
+  }
 
-{
-intent: "A"
+  async routeQuery(history: ChatMessage[], query: string) {
+    const prompt = await this.getPrompt();
+    const compiledPrompt = prompt.compile();
+
+    const response = await this.llm.chat({
+      langfusePrompt: prompt,
+      additionalChatOptions: {
+        response_format: { type: 'json_object' },
+      },
+      messages: [
+        {
+          role: 'system',
+          content: compiledPrompt,
+        },
+        ...history,
+        {
+          role: 'user',
+          content: query,
+        },
+      ],
+    });
+
+    if (!response.message?.content) {
+      return 'content';
+    }
+
+    const intent = JSON.parse(response.message.content as string) as {
+      intent: 'A' | 'B' | 'C';
+    };
+
+    const parsedIntent = ({ A: 'author', B: 'summary', C: 'content' } as const)[
+      intent.intent
+    ];
+
+    return parsedIntent;
+  }
 }
-`.trim();

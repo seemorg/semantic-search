@@ -1,61 +1,89 @@
+import { UsulBookDetailsResponse } from '../../types/usul';
+
+import { Injectable } from '@nestjs/common';
+import { langfuse } from '../../shared/langfuse/singleton';
+import { createAzureOpenAI } from '../../shared/azure-openai';
 import { ChatMessage, Metadata, NodeWithScore, TextNode } from 'llamaindex';
-import { UsulBookDetailsResponse } from 'src/types/usul';
 
-const RAG_SYSTEM_PROMPT = `
-You are Usul AI, a helpful research assistant built by Usul. Your task is to deliver an accurate and cited response to a user's query, drawing from the given search results. Your answer must be of high-quality, and written by an expert using an unbiased and journalistic tone. It is EXTREMELY IMPORTANT to directly answer the query. NEVER say "based on the search results". Your answer must be written in the same language as the query, even if the search results language is different.
+@Injectable()
+export class RagChatService {
+  private readonly llm = createAzureOpenAI({
+    temperature: 0.5,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.RAG',
+  });
 
-You MUST cite the most relevant search results that answer the query. Do not mention any irrelevant results. You MUST ADHERE to the following instructions for citing search results: - to cite a search result, enclose its index located above the summary with brackets at the end of the corresponding sentence, for example "Ice is less dense than water12." or "Paris is the capital of France145." - NO SPACE between the last word and the citation, and ALWAYS use brackets. Only use this format to cite search results. NEVER include a References section at the end of your answer. - If you don't know the answer or the premise is incorrect, explain why. If the search results are empty or unhelpful, answer the query as well as you can with existing knowledge.
+  private readonly retryLlm = createAzureOpenAI({
+    temperature: 0.5,
+    enableTracing: true,
+    tracingName: 'Chat.OpenAI.RAG.Retry',
+  });
 
-You should give direct quotes from the search results and cite them where it improves the answer and gives better context. When giving an answer that involves translating Quranic verses or Hadiths you MUST always write them in Arabic before translating them. You should ALWAYS wrap quranic verses in ornate parenthesis ﴾﴿.
-`.trim();
+  private getPrompt() {
+    return langfuse.getPrompt('rag');
+  }
 
-const formatSources = (sources: NodeWithScore<Metadata>[]) => {
-  return sources
-    .map((s, idx) => {
-      const text = (s.node as TextNode).text;
-      return `[${idx + 1}]: ${text}`;
-    })
-    .join('\n\n');
-};
+  private formatSources(sources: NodeWithScore<Metadata>[]) {
+    return sources
+      .map((s, idx) => {
+        const text = (s.node as TextNode).text;
+        return `[${idx + 1}]: ${text}`;
+      })
+      .join('\n\n');
+  }
 
-export const makeRagMessages = ({
-  response,
-  history,
-  query,
-  sources,
-}: {
-  response: UsulBookDetailsResponse;
-  history: ChatMessage[];
-  query: string;
-  sources: NodeWithScore<Metadata>[];
-}): ChatMessage[] => {
-  const bookName = response.book.primaryName;
-  const authorName = response.book.author.primaryName;
+  async answerQuery({
+    bookDetails,
+    history,
+    query,
+    sources,
+    isRetry,
+  }: {
+    isRetry?: boolean;
+    bookDetails: UsulBookDetailsResponse;
+    history: ChatMessage[];
+    sources: NodeWithScore<Metadata>[];
+    query: string;
+  }) {
+    const prompt = await this.getPrompt();
+    const llmToUse = isRetry ? this.retryLlm : this.llm;
 
-  return [
-    {
-      role: 'system',
-      content: RAG_SYSTEM_PROMPT,
-    },
-    ...history,
-    {
-      role: 'user',
-      content: [
+    const bookName = bookDetails.book.primaryName;
+    const authorName = bookDetails.book.author.primaryName;
+
+    const compiledPrompt = prompt.compile();
+
+    const response = await llmToUse.chat({
+      langfusePrompt: prompt,
+      stream: true,
+      messages: [
         {
-          type: 'text',
-          text: `
-Most relevant search results in "${bookName}" by "${authorName}":
-${formatSources(sources)}  
-`.trim(),
+          role: 'system',
+          content: compiledPrompt,
         },
+        ...history,
         {
-          type: 'text',
-          text: `
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `
+Most relevant search results in "${bookName}" by "${authorName}":
+${this.formatSources(sources)}
+          `.trim(),
+            },
+            {
+              type: 'text',
+              text: `
 User's query:
 ${query}
-`.trim(),
+          `.trim(),
+            },
+          ],
         },
       ],
-    },
-  ];
-};
+    });
+
+    return response;
+  }
+}
