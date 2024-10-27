@@ -38,12 +38,16 @@ export class RagChatService {
     query,
     sources,
     isRetry,
+    traceId,
+    sessionId,
   }: {
     isRetry?: boolean;
     bookDetails: UsulBookDetailsResponse;
     history: ChatMessage[];
     sources: NodeWithScore<Metadata>[];
     query: string;
+    traceId: string;
+    sessionId: string;
   }) {
     const prompt = await this.getPrompt();
     const llmToUse = isRetry ? this.retryLlm : this.llm;
@@ -55,6 +59,8 @@ export class RagChatService {
 
     const response = await llmToUse.chat({
       langfusePrompt: prompt,
+      traceId,
+      sessionId,
       stream: true,
       messages: [
         {

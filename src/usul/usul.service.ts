@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { UsulBookDetailsResponse } from '../types/usul';
 import { LRUCache } from 'lru-cache';
 
+const MAX_HEADINGS = 50;
+
 @Injectable()
 export class UsulService {
   private readonly API_BASE = 'https://api.usul.ai';
@@ -27,7 +29,46 @@ export class UsulService {
       throw new Error(await response.text());
     }
 
-    return (await response.json()) as UsulBookDetailsResponse;
+    const data = (await response.json()) as UsulBookDetailsResponse;
+
+    if (data.headings.length <= MAX_HEADINGS) {
+      return data;
+    }
+
+    const currentLevels = [1];
+    let newHeadings = [];
+
+    while (newHeadings.length === data.headings.length) {
+      const newLevelHeadings = this._getHeadings(data.headings, currentLevels);
+      if (newLevelHeadings.length > MAX_HEADINGS) {
+        if (currentLevels.length === 1) {
+          newHeadings = newLevelHeadings;
+        }
+
+        break;
+      }
+
+      currentLevels.push(currentLevels[currentLevels.length - 1] + 1);
+    }
+
+    data.headings = newHeadings;
+
+    return data;
+  }
+
+  private _getHeadings(
+    headings: UsulBookDetailsResponse['headings'],
+    levels: number[],
+  ) {
+    const newHeadings = [];
+
+    for (const heading of headings) {
+      if (levels.includes(heading.level)) {
+        newHeadings.push(heading);
+      }
+    }
+
+    return newHeadings;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

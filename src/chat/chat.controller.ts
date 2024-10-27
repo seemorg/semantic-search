@@ -23,8 +23,8 @@ export class ChatController {
 
   @Post('/:bookSlug')
   async initChat(@Body() body: ChatDto, @Param('bookSlug') bookSlug: string) {
-    const chat = await this.chatService.chatWithBook(bookSlug, body);
     const chatId = uuidv4();
+    const chat = await this.chatService.chatWithBook(bookSlug, body, chatId);
     this.chats.set(chatId, chat);
 
     setTimeout(() => {

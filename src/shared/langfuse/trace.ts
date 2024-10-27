@@ -54,6 +54,9 @@ const wrapMethod = async <T extends GenericMethod>(
 
   const promptName = extra?.promptName ?? config?.langfusePrompt?.name;
   const promptVersion = extra?.promptVersion ?? config?.langfusePrompt?.version;
+  const traceId = extra?.traceId ?? (config as LangfuseNewTraceConfig)?.traceId;
+  const sessionId =
+    extra?.sessionId ?? (config as LangfuseNewTraceConfig)?.sessionId;
 
   let observationData = {
     model,
@@ -85,7 +88,8 @@ const wrapMethod = async <T extends GenericMethod>(
     langfuseParent = langfuse.trace({
       ...config,
       ...observationData,
-      id: (config as LangfuseNewTraceConfig)?.traceId,
+      id: traceId,
+      sessionId,
       timestamp: observationData.startTime,
     });
   }

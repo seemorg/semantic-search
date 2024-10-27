@@ -21,10 +21,14 @@ export class BookSummaryChatService {
     bookDetails,
     history,
     query,
+    traceId,
+    sessionId,
   }: {
     bookDetails: UsulBookDetailsResponse;
     history: ChatMessage[];
     query: string;
+    traceId: string;
+    sessionId: string;
   }) {
     const prompt = await this.getPrompt();
     const book = bookDetails.book;
@@ -48,6 +52,8 @@ export class BookSummaryChatService {
 
     const response = await this.llm.chat({
       langfusePrompt: prompt,
+      traceId,
+      sessionId,
       stream: true,
       messages: [
         {

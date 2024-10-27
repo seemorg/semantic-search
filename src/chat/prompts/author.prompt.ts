@@ -20,10 +20,14 @@ export class AuthorChatService {
     bookDetails,
     history,
     query,
+    traceId,
+    sessionId,
   }: {
     bookDetails: UsulBookDetailsResponse;
     history: ChatMessage[];
     query: string;
+    traceId: string;
+    sessionId: string;
   }) {
     const prompt = await this.getPrompt();
     const author = bookDetails.book.author;
@@ -48,6 +52,8 @@ export class AuthorChatService {
 
     const response = await this.llm.chat({
       langfusePrompt: prompt,
+      traceId,
+      sessionId,
       stream: true,
       messages: [
         {

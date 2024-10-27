@@ -10,6 +10,8 @@ import { CondenseService } from './prompts/condense.prompt';
 import { RagChatService } from './prompts/rag.prompt';
 import { ChatRouterService } from './prompts/router.prompt';
 import { ChatFormatterService } from './format.service';
+import { langfuse } from 'src/shared/langfuse/singleton';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class ChatService {
@@ -46,8 +48,11 @@ export class ChatService {
     });
   }
 
-  async chatWithBook(bookSlug: string, body: ChatDto) {
-    const chatHistory = body.messages.map(
+  async chatWithBook(bookSlug: string, body: ChatDto, chatId: string) {
+    const sessionId = uuidv4();
+
+    // get last 6 messages
+    const chatHistory = body.messages.slice(-6).map(
       (m): ChatMessage => ({
         role: m.role === 'user' ? 'user' : 'assistant',
         content: m.text,
@@ -57,6 +62,7 @@ export class ChatService {
     const routerResult = await this.routerService.routeQuery(
       chatHistory,
       body.question,
+      sessionId,
     );
     const bookDetails = await this.usulService.getBookDetails(bookSlug);
 
@@ -66,6 +72,8 @@ export class ChatService {
           bookDetails,
           history: chatHistory,
           query: body.question,
+          traceId: chatId,
+          sessionId,
         }),
       );
     }
@@ -76,6 +84,8 @@ export class ChatService {
           bookDetails,
           history: chatHistory,
           query: body.question,
+          traceId: chatId,
+          sessionId,
         }),
       );
     }
@@ -89,6 +99,7 @@ export class ChatService {
         chatHistory,
         query: body.question,
         isRetry: body.isRetry === 'true',
+        sessionId,
       });
     }
 
@@ -101,27 +112,20 @@ export class ChatService {
         query: ragQuery,
         sources,
         isRetry: body.isRetry === 'true',
+        traceId: chatId,
+        sessionId,
       }),
       sources,
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async feedback(chatId: string, feedback: FeedbackDto['type']) {
-    // const response = await fetch(
-    //   `https://api.helicone.ai/v1/${chatId}/feedback`,
-    //   {
-    //     method: 'POST',
-    //     headers: {
-    //       'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify({
-    //       // true for positive, false for negative
-    //       rating: feedback === 'positive',
-    //     }),
-    //   },
-    // );
+    langfuse.score({
+      traceId: chatId,
+      name: 'user_feedback',
+      value: feedback === 'negative' ? 0 : 1,
+    });
+
     return { success: true };
   }
 }

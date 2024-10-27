@@ -15,12 +15,13 @@ export class ChatRouterService {
     return langfuse.getPrompt('router');
   }
 
-  async routeQuery(history: ChatMessage[], query: string) {
+  async routeQuery(history: ChatMessage[], query: string, sessionId: string) {
     const prompt = await this.getPrompt();
     const compiledPrompt = prompt.compile();
 
     const response = await this.llm.chat({
       langfusePrompt: prompt,
+      sessionId,
       additionalChatOptions: {
         response_format: { type: 'json_object' },
       },

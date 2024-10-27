@@ -16,8 +16,10 @@ type ParsedOpenAIArguments = {
   input: Record<string, any> | string;
   modelParameters: Record<string, any>;
   extra: {
+    traceId?: string;
+    sessionId?: string;
     promptName?: string;
-    promptVersion?: string;
+    promptVersion?: number;
   };
 };
 
@@ -100,8 +102,10 @@ export const parseInputArgs = (
     input: input,
     modelParameters: params,
     extra: {
-      promptName: (args as any)?.langfusePrompt?.name,
-      promptVersion: (args as any)?.langfusePrompt?.version,
+      traceId: args.traceId,
+      sessionId: args.sessionId,
+      promptName: args?.langfusePrompt?.name,
+      promptVersion: args?.langfusePrompt?.version,
     },
   };
 };

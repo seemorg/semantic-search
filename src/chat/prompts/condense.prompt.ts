@@ -24,17 +24,21 @@ export class CondenseService {
     chatHistory,
     query,
     isRetry,
+    sessionId,
   }: {
     chatHistory: ChatMessage[];
     query: string;
     isRetry?: boolean;
+    sessionId: string;
   }) {
     const llmToUse = isRetry ? this.retryLlm : this.llm;
     const prompt = await this.getPrompt();
 
     const compiledPrompt = prompt.compile({
       chatHistory: chatHistory
-        .map((m) => `${m.role === 'user' ? 'Human' : 'Assistant'}`)
+        .map(
+          (m) => `${m.role === 'user' ? 'Human' : 'Assistant'}: ${m.content}`,
+        )
         .join('\n'),
       query,
     }) as ChatMessage[];
@@ -42,6 +46,7 @@ export class CondenseService {
     const response = await llmToUse.chat({
       langfusePrompt: prompt,
       messages: compiledPrompt,
+      sessionId,
     });
 
     return response.message.content as string;
