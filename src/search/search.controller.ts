@@ -21,6 +21,7 @@ export class SearchController {
     return results.map((match) => ({
       score: match.score,
       text: (match.node as TextNode).text,
+      summary: match.summary,
       metadata: match.node.metadata,
     }));
   }
