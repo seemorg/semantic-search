@@ -1,6 +1,5 @@
 import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
 import { SearchService } from './search.service';
-import { TextNode } from 'llamaindex';
 
 @Controller('/search')
 export class SearchController {
@@ -18,11 +17,6 @@ export class SearchController {
     // const results = await this.pineconeService.query(query, bookSlug);
     const results = await this.searchService.searchWithinBook(bookSlug, query);
 
-    return results.map((match) => ({
-      score: match.score,
-      text: (match.node as TextNode).text,
-      summary: match.summary,
-      metadata: match.node.metadata,
-    }));
+    return results;
   }
 }

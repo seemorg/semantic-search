@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Metadata, NodeWithScore } from 'llamaindex';
+import { Metadata, NodeWithScore, TextNode } from 'llamaindex';
 import { createAzureOpenAI } from '../shared/azure-openai';
 import { langfuse } from '../shared/langfuse/singleton';
 import { createVectorStoreIndex } from '../shared/vector-store';
@@ -46,8 +46,14 @@ export class SearchService {
     query: string,
     results: NodeWithScore<Metadata>[],
   ) {
-    const batches = chunk(results, 5);
-    const prompt = await langfuse.getPrompt('search.summarize');
+    const formattedResults = results.map((match) => ({
+      score: match.score,
+      text: (match.node as TextNode).text,
+      metadata: match.node.metadata,
+    }));
+
+    const batches = chunk(formattedResults, 5) as (typeof formattedResults)[];
+    const prompt = await langfuse.getPrompt('search.enhance');
     const compiledPrompt = prompt.compile();
 
     const summaries = await Promise.all(
@@ -64,7 +70,8 @@ export class SearchService {
               content: `
 Search Query: ${query}
 
-Results: ${JSON.stringify(batch)}
+Results: 
+${batch.map((r, idx) => `[${idx}]. ${r.text}`).join('\n\n')}
 `.trim(),
             },
           ],
@@ -86,9 +93,14 @@ Results: ${JSON.stringify(batch)}
 
       return parsed.map((n) => ({
         ...nodes[n.originalIndex],
-        summary: n.text,
+        summary: this.replaceHighlights(n.text),
       }));
     });
+  }
+
+  // replace text in [[...]] with <em>...</em>
+  private replaceHighlights(text: string) {
+    return text.replace(/\[\[(.*?)\]\]/g, '<em>$1</em>');
   }
 
   //   private async highlightRelevantText(
