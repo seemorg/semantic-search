@@ -80,96 +80,33 @@ ${batch.map((r, idx) => `[${idx}]. ${r.text}`).join('\n\n')}
     );
 
     return summaries.flatMap((s, idx) => {
-      const nodes = batches[idx];
+      const batch = batches[idx];
 
-      const parsed = (
-        JSON.parse(s.message.content as string) as {
-          summaries: {
-            originalIndex: number;
-            text: string;
-          }[];
+      // index -> summary
+      let parsed: Record<number, string> = {};
+
+      try {
+        parsed = JSON.parse(s.message.content as string);
+      } catch (e) {}
+
+      return batch.map((node, idx) => {
+        if (!parsed[idx]) {
+          return node;
         }
-      ).summaries;
 
-      return parsed.map((n) => ({
-        ...nodes[n.originalIndex],
-        summary: this.replaceHighlights(n.text),
-      }));
+        return {
+          ...node,
+          text: this.replaceHighlights(parsed[idx]),
+        };
+      });
     });
   }
 
   // replace text in [[...]] with <em>...</em>
+  // replace text in [..] with <strong>...</strong>
   private replaceHighlights(text: string) {
-    return text.replace(/\[\[(.*?)\]\]/g, '<em>$1</em>');
+    return text
+      .replace(/\[\[(.*?)\]\]/g, '<em>$1</em>')
+      .replace(/\[(.*?)\]/g, '<strong>$1</strong>');
   }
-
-  //   private async highlightRelevantText(
-  //     query: string,
-  //     results: NodeWithScore<Metadata>[],
-  //   ) {
-  //     const response = await this.llm.chat({
-  //       messages: [
-  //         {
-  //           role: 'system',
-  //           content: `
-  // Given chunks of text and a user query, return a JSON with words or phrases from the texts that are relevant to the user query so that they can be highlighted.
-
-  // Make sure to:
-  // - include keywords as a separate entry in the array
-  // - do not include duplicates
-  // - do not add html tags and instead add them as they appear exactly
-
-  // Example schema:
-  // {
-  //   "highlights": [
-  //     "..."
-  //   ]
-  // }
-  //         `.trim(),
-  //         },
-  //         {
-  //           role: 'user',
-  //           content: `
-  // Search Query: ${query}
-  // Results:
-  // ${JSON.stringify(results.map((r) => (r.node as TextNode).getText()))}
-
-  // Output:
-  // `.trim(),
-  //         },
-  //       ],
-  //     });
-  //     let highlights:
-  //       | {
-  //           highlights: string[];
-  //         }
-  //       | undefined;
-
-  //     try {
-  //       highlights = JSON.parse(response.message.content as string) as {
-  //         highlights: string[];
-  //       };
-  //     } catch (e) {}
-
-  //     let updatedResults = results;
-  //     if (highlights) {
-  //       const regex = new RegExp(
-  //         highlights.highlights
-  //           .map((highlight) =>
-  //             highlight.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'),
-  //           )
-  //           .join('|'),
-  //         'gi',
-  //       );
-
-  //       // after we got the results, we need to highlight the relevant parts of the text using gpt-3.5 turbo
-  //       updatedResults = results.map((r) => {
-  //         const node = r.node as TextNode;
-  //         node.text = node.text.replace(regex, (match) => `<em>${match}</em>`);
-  //         return r;
-  //       });
-  //     }
-
-  //     return updatedResults;
-  //   }
 }
