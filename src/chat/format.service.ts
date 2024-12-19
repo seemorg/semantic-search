@@ -1,18 +1,13 @@
 import { Injectable, type MessageEvent } from '@nestjs/common';
-import type {
-  ChatResponseChunk,
-  Metadata,
-  NodeWithScore,
-  TextNode,
-  ToolCallLLMMessageOptions,
-} from 'llamaindex';
+import type { ChatResponseChunk, ToolCallLLMMessageOptions } from 'llamaindex';
 import { Observable } from 'rxjs';
+import type { AzureSearchResult } from 'src/retriever/retriever.service';
 
 @Injectable()
 export class ChatFormatterService {
   chatIterableToObservable(
     iterator: AsyncIterable<ChatResponseChunk<ToolCallLLMMessageOptions>>,
-    sources?: NodeWithScore[],
+    sources?: AzureSearchResult[],
   ) {
     return new Observable<MessageEvent>((subscriber) => {
       (async () => {
@@ -36,7 +31,7 @@ export class ChatFormatterService {
     });
   }
 
-  private formatSources(_sources: NodeWithScore<Metadata>[]) {
+  private formatSources(_sources: AzureSearchResult[]) {
     const sources: {
       score: number;
       text: string;
@@ -44,13 +39,13 @@ export class ChatFormatterService {
     }[] = [];
 
     for (const source of _sources) {
-      if (source.node.metadata?.isInternal) {
-        continue;
-      }
+      // if (source.node.metadata?.isInternal) {
+      //   continue;
+      // }
 
       sources.push({
         score: source.score,
-        text: (source.node as TextNode).text,
+        text: source.node.text,
         metadata: source.node.metadata,
       });
     }

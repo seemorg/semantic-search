@@ -21,6 +21,7 @@
     "with-env": "dotenv tsx"
   },
   "dependencies": {
+    "@azure/search-documents": "^12.1.0",
     "@langchain/community": "^0.2.3",
     "@langchain/core": "^0.2.7",
     "@langchain/openai": "^0.0.34",

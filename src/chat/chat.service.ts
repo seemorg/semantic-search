@@ -2,7 +2,6 @@ import type { ChatMessage } from 'llamaindex';
 import { Injectable } from '@nestjs/common';
 import { ChatDto } from './dto/chat.dto';
 import { FeedbackDto } from './dto/feedback.dto';
-import { createVectorStoreIndex } from 'src/shared/vector-store';
 import { AuthorChatService } from './prompts/author.prompt';
 import { BookSummaryChatService } from './prompts/book.prompt';
 import { UsulService } from '../usul/usul.service';
@@ -12,6 +11,7 @@ import { ChatRouterService } from './prompts/router.prompt';
 import { ChatFormatterService } from './format.service';
 import { langfuse } from 'src/shared/langfuse/singleton';
 import { v4 as uuidv4 } from 'uuid';
+import { RetrieverService } from 'src/retriever/retriever.service';
 
 @Injectable()
 export class ChatService {
@@ -23,30 +23,8 @@ export class ChatService {
     private readonly authorService: AuthorChatService,
     private readonly bookService: BookSummaryChatService,
     private readonly ragService: RagChatService,
+    private readonly retrieverService: RetrieverService,
   ) {}
-
-  private readonly vectorStoreIndex = createVectorStoreIndex();
-
-  async retrieveSources(bookSlug: string, query: string) {
-    const index = await this.vectorStoreIndex;
-
-    const retriever = index.asRetriever({
-      similarityTopK: 5,
-    });
-
-    return retriever.retrieve({
-      query,
-      preFilters: {
-        filters: [
-          {
-            key: 'bookSlug',
-            value: bookSlug,
-            filterType: 'ExactMatch',
-          },
-        ],
-      },
-    });
-  }
 
   async chatWithBook(bookSlug: string, body: ChatDto, chatId: string) {
     const sessionId = uuidv4();
@@ -103,7 +81,9 @@ export class ChatService {
       });
     }
 
-    const sources = await this.retrieveSources(bookSlug, ragQuery);
+    const sources = await this.retrieverService
+      .azureGetSourcesFromBook(bookDetails.book.id, ragQuery, 'vector')
+      .then((r) => r.results);
 
     return this.formatterService.chatIterableToObservable(
       await this.ragService.answerQuery({

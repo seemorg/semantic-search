@@ -2,10 +2,8 @@ import {
   CorrectnessEvaluator,
   RelevancyEvaluator,
   FaithfulnessEvaluator,
-  VectorStoreIndex,
 } from 'llamaindex';
 import { setLlamaindexSettings } from 'src/shared/llamaindex';
-import { createVectorStore } from 'src/shared/vector-store';
 import fs from 'fs';
 
 setLlamaindexSettings('DEV');
@@ -23,9 +21,9 @@ const queries = [
 ];
 
 const main = async () => {
-  const index = await VectorStoreIndex.fromVectorStore(
-    createVectorStore('DEV'),
-  );
+  // const index = await VectorStoreIndex.fromVectorStore(
+  //   createVectorStore('DEV'),
+  // );
   const queryEngine = index.asQueryEngine({
     similarityTopK: 5,
     preFilters: {

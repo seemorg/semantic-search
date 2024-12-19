@@ -8,9 +8,10 @@ import { ChatFormatterService } from './format.service';
 import { AuthorChatService } from './prompts/author.prompt';
 import { BookSummaryChatService } from './prompts/book.prompt';
 import { RagChatService } from './prompts/rag.prompt';
+import { RetrieverModule } from 'src/retriever/retriever.module';
 
 @Module({
-  imports: [UsulModule],
+  imports: [UsulModule, RetrieverModule],
   providers: [
     CondenseService,
     ChatRouterService,

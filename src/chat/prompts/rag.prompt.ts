@@ -3,7 +3,8 @@ import { UsulBookDetailsResponse } from '../../types/usul';
 import { Injectable } from '@nestjs/common';
 import { langfuse } from '../../shared/langfuse/singleton';
 import { createAzureOpenAI } from '../../shared/azure-openai';
-import { ChatMessage, Metadata, NodeWithScore, TextNode } from 'llamaindex';
+import { ChatMessage } from 'llamaindex';
+import type { AzureSearchResult } from 'src/retriever/retriever.service';
 
 @Injectable()
 export class RagChatService {
@@ -23,10 +24,10 @@ export class RagChatService {
     return langfuse.getPrompt('rag');
   }
 
-  private formatSources(sources: NodeWithScore<Metadata>[]) {
+  private formatSources(sources: AzureSearchResult[]) {
     return sources
       .map((s, idx) => {
-        const text = (s.node as TextNode).text;
+        const text = s.node.text;
         return `[${idx + 1}]: ${text}`;
       })
       .join('\n\n');
@@ -44,7 +45,7 @@ export class RagChatService {
     isRetry?: boolean;
     bookDetails: UsulBookDetailsResponse;
     history: ChatMessage[];
-    sources: NodeWithScore<Metadata>[];
+    sources: AzureSearchResult[];
     query: string;
     traceId: string;
     sessionId: string;

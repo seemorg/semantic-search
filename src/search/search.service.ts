@@ -1,13 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { Metadata, NodeWithScore, TextNode } from 'llamaindex';
 import { createAzureOpenAI } from '../shared/azure-openai';
 import { langfuse } from '../shared/langfuse/singleton';
-import { createVectorStoreIndex } from '../shared/vector-store';
 import { chunk } from '../shared/utils';
+import {
+  type AzureSearchResult,
+  RetrieverService,
+} from 'src/retriever/retriever.service';
+import { UsulService } from 'src/usul/usul.service';
 
 @Injectable()
 export class SearchService {
-  private readonly vectorStoreIndex = createVectorStoreIndex();
+  constructor(
+    private readonly retrieverService: RetrieverService,
+    private readonly usulService: UsulService,
+  ) {}
 
   private readonly llm = createAzureOpenAI({
     additionalChatOptions: {
@@ -17,38 +23,33 @@ export class SearchService {
     tracingName: 'Search.OpenAI.Book',
   });
 
-  async searchWithinBook(bookSlug: string, query: string) {
-    const index = await this.vectorStoreIndex;
+  async searchWithinBook(
+    bookSlug: string,
+    query: string,
+    type: 'semantic' | 'keyword' = 'semantic',
+  ) {
+    const bookDetails = await this.usulService.getBookDetails(bookSlug);
 
-    const queryEngine = index.asRetriever({
-      similarityTopK: 10,
-    });
+    const results = await this.retrieverService
+      .azureGetSourcesFromBook(
+        bookDetails.book.id,
+        query,
+        type === 'semantic' ? 'vector' : 'text',
+        10,
+      )
+      .then((r) => r.results);
 
-    const results = await queryEngine.retrieve({
-      query,
-      preFilters: {
-        filters: [
-          {
-            key: 'bookSlug',
-            value: bookSlug,
-            filterType: 'ExactMatch',
-          },
-        ],
-      },
-    });
+    if (type === 'keyword') {
+      return results.map((match) => match.node);
+    }
 
-    const updatedResults = await this.summarizeChunks(query, results);
-
-    return updatedResults;
+    return this.summarizeChunks(query, results);
   }
 
-  private async summarizeChunks(
-    query: string,
-    results: NodeWithScore<Metadata>[],
-  ) {
+  private async summarizeChunks(query: string, results: AzureSearchResult[]) {
     const formattedResults = results.map((match) => ({
       score: match.score,
-      text: (match.node as TextNode).text,
+      text: match.node.text,
       metadata: match.node.metadata,
     }));
 
