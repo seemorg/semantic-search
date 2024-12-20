@@ -20,9 +20,9 @@ export class UsulService {
     },
   });
 
-  private async _getBookDetails(slug: string, locale: string = 'en') {
+  private async _getBookDetails(id: string, locale: string = 'en') {
     const response = await fetch(
-      `${this.API_BASE}/book/details/${slug}?locale=${locale}`,
+      `${this.API_BASE}/book/details/${id}?locale=${locale}`,
     );
 
     if (response.status > 299) {
@@ -72,7 +72,7 @@ export class UsulService {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async getBookDetails(slug: string, _locale: string = 'en') {
-    return this.cache.fetch(slug);
+  async getBookDetails(id: string, _locale: string = 'en') {
+    return this.cache.fetch(id);
   }
 }

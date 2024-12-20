@@ -26,7 +26,7 @@ export class ChatService {
     private readonly retrieverService: RetrieverService,
   ) {}
 
-  async chatWithBook(bookSlug: string, body: ChatDto, chatId: string) {
+  async chatWithBook(bookId: string, body: ChatDto, chatId: string) {
     const sessionId = uuidv4();
 
     // get last 6 messages
@@ -42,7 +42,7 @@ export class ChatService {
       body.question,
       sessionId,
     );
-    const bookDetails = await this.usulService.getBookDetails(bookSlug);
+    const bookDetails = await this.usulService.getBookDetails(bookId);
 
     if (routerResult === 'author') {
       return this.formatterService.chatIterableToObservable(

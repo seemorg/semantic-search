@@ -8,7 +8,7 @@ export class SearchController {
   @Get('/')
   async search(
     @Query('q') query: string,
-    @Query('bookSlug') bookSlug: string,
+    @Query('bookId') bookId: string,
     @Query('type') type: 'semantic' | 'keyword' = 'semantic',
   ) {
     if (!query) {
@@ -22,7 +22,7 @@ export class SearchController {
     }
 
     const results = await this.searchService.searchWithinBook(
-      bookSlug,
+      bookId,
       query,
       type,
     );

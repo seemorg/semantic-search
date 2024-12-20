@@ -24,15 +24,13 @@ export class SearchService {
   });
 
   async searchWithinBook(
-    bookSlug: string,
+    bookId: string,
     query: string,
     type: 'semantic' | 'keyword' = 'semantic',
   ) {
-    const bookDetails = await this.usulService.getBookDetails(bookSlug);
-
     const results = await this.retrieverService
       .azureGetSourcesFromBook(
-        bookDetails.book.id,
+        bookId,
         query,
         type === 'semantic' ? 'vector' : 'text',
         10,

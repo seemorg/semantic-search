@@ -21,10 +21,10 @@ export class ChatController {
 
   private readonly chats = new Map<string, Observable<MessageEvent>>();
 
-  @Post('/:bookSlug')
-  async initChat(@Body() body: ChatDto, @Param('bookSlug') bookSlug: string) {
+  @Post('/:bookId')
+  async initChat(@Body() body: ChatDto, @Param('bookId') bookId: string) {
     const chatId = uuidv4();
-    const chat = await this.chatService.chatWithBook(bookSlug, body, chatId);
+    const chat = await this.chatService.chatWithBook(bookId, body, chatId);
     this.chats.set(chatId, chat);
 
     setTimeout(() => {
