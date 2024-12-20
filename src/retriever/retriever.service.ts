@@ -107,7 +107,7 @@ export class RetrieverService {
           score: r.score,
           node: {
             text: r.document.content,
-            highlights: r.highlights?.chunk_content ?? [],
+            highlights: r.highlights?.content ?? [],
             metadata: {
               bookId: r.document.book_id,
               pages: [
