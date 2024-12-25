@@ -6,14 +6,11 @@ import {
   type AzureSearchResult,
   RetrieverService,
 } from 'src/retriever/retriever.service';
-import { UsulService } from 'src/usul/usul.service';
+import { SearchParamsDto, SearchType } from './dto/search-params.dto';
 
 @Injectable()
 export class SearchService {
-  constructor(
-    private readonly retrieverService: RetrieverService,
-    private readonly usulService: UsulService,
-  ) {}
+  constructor(private readonly retrieverService: RetrieverService) {}
 
   private readonly llm = createAzureOpenAI({
     additionalChatOptions: {
@@ -23,25 +20,28 @@ export class SearchService {
     tracingName: 'Search.OpenAI.Book',
   });
 
-  async searchWithinBook(
-    bookId: string,
-    query: string,
-    type: 'semantic' | 'keyword' = 'semantic',
-  ) {
-    const results = await this.retrieverService
-      .azureGetSourcesFromBook(
-        bookId,
-        query,
-        type === 'semantic' ? 'vector' : 'text',
-        10,
-      )
-      .then((r) => r.results);
+  async searchWithinBook(params: SearchParamsDto) {
+    const { bookId, q: query, type } = params;
 
-    if (type === 'keyword') {
-      return results.map((match) => match.node);
+    const results = await this.retrieverService.azureGetSourcesFromBook({
+      id: bookId,
+      query,
+      type: type === SearchType.SEMANTIC ? 'vector' : 'text',
+      limit: params.limit,
+      page: params.page,
+    });
+
+    if (type === SearchType.KEYWORD) {
+      return {
+        ...results,
+        results: results.results.map((r) => r.node),
+      };
     }
 
-    return this.summarizeChunks(query, results);
+    return {
+      ...results,
+      results: await this.summarizeChunks(query, results.results),
+    };
   }
 
   private async summarizeChunks(query: string, results: AzureSearchResult[]) {

@@ -30,22 +30,31 @@ export class RetrieverService {
     return results;
   }
 
-  async azureGetSourcesFromBook(
-    id: string,
-    query: string,
-    type: 'vector' | 'text' = 'vector',
+  async azureGetSourcesFromBook({
+    id,
+    query,
+    type = 'vector',
     limit = 5,
-  ) {
+    page = 1,
+  }: {
+    id: string;
+    query: string;
+    type: 'vector' | 'text';
+    limit?: number;
+    page?: number;
+  }) {
     const filter = odata`book_id eq '${id}'`;
 
     let results: SearchDocumentsResult<
       KeywordSearchBookChunk | VectorSearchBookChunk,
       SelectFields<KeywordSearchBookChunk | VectorSearchBookChunk>
     >;
+
     if (type === 'text') {
       results = await this.keywordSearchClient.search(query, {
         filter,
         top: limit,
+        skip: (page - 1) * limit,
         searchFields: ['content'],
         includeTotalCount: true,
         highlightFields: 'content',
@@ -55,6 +64,7 @@ export class RetrieverService {
       results = await this.vectorSearchClient.search(undefined, {
         filter,
         top: limit,
+        skip: (page - 1) * limit,
         includeTotalCount: true,
         vectorSearchOptions: {
           queries: [
@@ -68,25 +78,16 @@ export class RetrieverService {
       });
     }
 
-    // if (type === 'hybrid') {
-    //   results = await this.azureSearchClient.search(query, {
-    //     filter,
-    //     top: limit,
-    //     includeTotalCount: true,
-    //     vectorSearchOptions: {
-    //       queries: [
-    //         {
-    //           kind: 'text',
-    //           fields: ['chunk_embedding'],
-    //           text: query,
-    //         },
-    //       ],
-    //     },
-    //   });
-    // }
+    const total = results.count;
+    const totalPages = Math.ceil(total / limit);
 
     return {
-      total: results.count,
+      total,
+      totalPages,
+      perPage: limit,
+      currentPage: page,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
       results: (await this.asyncIterableToArray(results.results)).map((r) => {
         if ('chunk_content' in r.document) {
           return {

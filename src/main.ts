@@ -23,7 +23,8 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
-      // whitelist: true, // will remove unvalidated fields
+      whitelist: true, // will remove un-validated fields
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
 

@@ -82,7 +82,11 @@ export class ChatService {
     }
 
     const sources = await this.retrieverService
-      .azureGetSourcesFromBook(bookDetails.book.id, ragQuery, 'vector')
+      .azureGetSourcesFromBook({
+        id: bookDetails.book.id,
+        query: ragQuery,
+        type: 'vector',
+      })
       .then((r) => r.results);
 
     return this.formatterService.chatIterableToObservable(
