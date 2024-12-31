@@ -54,6 +54,8 @@ export class RetrieverService {
       results = await this.keywordSearchClient.search(query, {
         filter,
         top: limit,
+        queryType: 'full',
+        searchMode: 'all',
         skip: (page - 1) * limit,
         searchFields: ['content'],
         includeTotalCount: true,
