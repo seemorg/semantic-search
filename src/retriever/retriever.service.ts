@@ -32,18 +32,20 @@ export class RetrieverService {
 
   async azureGetSourcesFromBook({
     id,
+    sourceAndVersion,
     query,
     type = 'vector',
     limit = 5,
     page = 1,
   }: {
     id: string;
+    sourceAndVersion: string;
     query: string;
     type: 'vector' | 'text';
     limit?: number;
     page?: number;
   }) {
-    const filter = odata`book_id eq '${id}'`;
+    const filter = odata`book_id eq '${id}' and book_version_id eq '${sourceAndVersion}'`;
 
     let results: SearchDocumentsResult<
       KeywordSearchBookChunk | VectorSearchBookChunk,

@@ -26,7 +26,12 @@ export class ChatService {
     private readonly retrieverService: RetrieverService,
   ) {}
 
-  async chatWithBook(bookId: string, body: ChatDto, chatId: string) {
+  async chatWithBook(
+    bookId: string,
+    versionId: string,
+    body: ChatDto,
+    chatId: string,
+  ) {
     const sessionId = uuidv4();
 
     // get last 6 messages
@@ -81,9 +86,15 @@ export class ChatService {
       });
     }
 
+    const version = bookDetails.book.versions.find((v) => v.id === versionId);
+    if (!version) {
+      throw new Error('Version not found');
+    }
+
     const sources = await this.retrieverService
       .azureGetSourcesFromBook({
         id: bookDetails.book.id,
+        sourceAndVersion: `${version.source}:${version.value}`,
         query: ragQuery,
         type: 'vector',
       })

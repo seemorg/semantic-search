@@ -7,10 +7,14 @@ import {
   RetrieverService,
 } from 'src/retriever/retriever.service';
 import { SearchParamsDto, SearchType } from './dto/search-params.dto';
+import { UsulService } from 'src/usul/usul.service';
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly retrieverService: RetrieverService) {}
+  constructor(
+    private readonly retrieverService: RetrieverService,
+    private readonly usulService: UsulService,
+  ) {}
 
   private readonly llm = createAzureOpenAI({
     additionalChatOptions: {
@@ -21,10 +25,18 @@ export class SearchService {
   });
 
   async searchWithinBook(params: SearchParamsDto) {
-    const { bookId, q: query, type } = params;
+    const { bookId, versionId, q: query, type } = params;
+
+    const bookDetails = await this.usulService.getBookDetails(bookId);
+    const version = bookDetails.book.versions.find((v) => v.id === versionId);
+
+    if (!version) {
+      throw new Error('Version not found');
+    }
 
     const results = await this.retrieverService.azureGetSourcesFromBook({
       id: bookId,
+      sourceAndVersion: `${version.source}:${version.value}`,
       query,
       type: type === SearchType.SEMANTIC ? 'vector' : 'text',
       limit: params.limit,

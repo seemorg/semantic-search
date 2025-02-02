@@ -1,4 +1,5 @@
 interface BookVersion {
+  id: string;
   source: 'openiti' | 'turath' | 'external' | 'pdf';
   value: string;
   publicationDetails?: {

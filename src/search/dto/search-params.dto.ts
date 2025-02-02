@@ -19,6 +19,9 @@ export class SearchParamsDto {
   @IsString()
   bookId: string;
 
+  @IsString()
+  versionId: string;
+
   @IsOptional()
   @IsEnum(SearchType)
   type: SearchType = SearchType.SEMANTIC;
