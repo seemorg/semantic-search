@@ -16,8 +16,8 @@ export const createAzureOpenAI = ({
 } = {}) => {
   const client = new OpenAI({
     azure: {
-      apiKey: process.env.AZURE_SECRET_KEY,
-      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
+      apiKey: process.env.AZURE_LLM_SECRET_KEY,
+      endpoint: `https://${process.env.AZURE_LLM_RESOURCE_NAME}.openai.azure.com`,
       deploymentName: process.env.AZURE_LLM_DEPLOYMENT_NAME,
     },
     temperature,
@@ -45,8 +45,8 @@ export const createAzureOpenAIEmbeddings = (
 ) =>
   new OpenAIEmbedding({
     azure: {
-      apiKey: process.env.AZURE_SECRET_KEY,
-      endpoint: `https://${process.env.AZURE_RESOURCE_NAME}.openai.azure.com`,
+      apiKey: process.env.AZURE_EMBEDDINGS_SECRET_KEY,
+      endpoint: `https://${process.env.AZURE_EMBEDDINGS_RESOURCE_NAME}.openai.azure.com`,
       deploymentName: process.env.AZURE_EMBEDDINGS_DEPLOYMENT_NAME,
     },
     dimensions: 3072,

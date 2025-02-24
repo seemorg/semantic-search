@@ -6,29 +6,23 @@ export class EnvironmentVariables {
   @IsOptional()
   NODE_ENV: Environment = Environment.Development;
 
-  // @IsString()
-  // OPENAI_API_KEY: string;
-
-  // @IsString()
-  // QDRANT_URL: string;
-
-  // @IsString()
-  // QDRANT_API_KEY: string;
-
-  // @IsString()
-  // QDRANT_COLLECTION: string;
-
   @IsString()
   AZURE_EMBEDDINGS_DEPLOYMENT_NAME: string;
+
+  @IsString()
+  AZURE_EMBEDDINGS_RESOURCE_NAME: string;
+
+  @IsString()
+  AZURE_EMBEDDINGS_SECRET_KEY: string;
 
   @IsString()
   AZURE_LLM_DEPLOYMENT_NAME: string;
 
   @IsString()
-  AZURE_RESOURCE_NAME: string;
+  AZURE_LLM_RESOURCE_NAME: string;
 
   @IsString()
-  AZURE_SECRET_KEY: string;
+  AZURE_LLM_SECRET_KEY: string;
 
   @IsString()
   AZURE_SEARCH_ENDPOINT: string;
