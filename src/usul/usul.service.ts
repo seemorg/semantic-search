@@ -30,6 +30,7 @@ export class UsulService {
     }
 
     const data = (await response.json()) as UsulBookDetailsResponse;
+    data.fullHeadings = data.headings;
 
     if (data.headings.length <= MAX_HEADINGS) {
       return data;

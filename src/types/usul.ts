@@ -62,5 +62,9 @@ export type UsulBookDetailsResponse = {
     | { volume?: number; page?: number; title: string; level: number }
     | { page?: { vol: string; page: number }; title: string; level: number }
   )[];
+  fullHeadings: (
+    | { volume?: number; page?: number; title: string; level: number }
+    | { page?: { vol: string; page: number }; title: string; level: number }
+  )[];
   publicationDetails?: PublicationDetails;
 };

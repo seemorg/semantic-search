@@ -36,6 +36,9 @@ export class EnvironmentVariables {
   @IsString()
   AZURE_VECTOR_SEARCH_INDEX: string;
 
+  @IsString()
+  ANSARI_API_KEY: string;
+
   @IsPort()
   @IsOptional()
   PORT = '3000'; // default port

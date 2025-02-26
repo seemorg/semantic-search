@@ -8,6 +8,7 @@ import {
 } from 'src/retriever/retriever.service';
 import { SearchParamsDto, SearchType } from './dto/search-params.dto';
 import { UsulService } from 'src/usul/usul.service';
+import { VectorSearchParamsDto } from './dto/vector-search-params.dto';
 
 @Injectable()
 export class SearchService {
@@ -23,6 +24,49 @@ export class SearchService {
     enableTracing: true,
     tracingName: 'Search.OpenAI.Book',
   });
+
+  async vectorSearch(
+    bookId: string,
+    versionId: string,
+    params: VectorSearchParamsDto,
+  ) {
+    const { q: query, limit, page } = params;
+
+    const bookDetails = await this.usulService.getBookDetails(bookId);
+    const version = bookDetails.book.versions.find((v) => v.id === versionId);
+
+    if (!version) {
+      throw new Error('Version not found');
+    }
+
+    const results = await this.retrieverService.azureGetSourcesFromBook({
+      id: bookId,
+      sourceAndVersion: `${version.source}:${version.value}`,
+      query,
+      type: 'vector',
+      limit,
+      page,
+    });
+
+    return {
+      ...results,
+      results: results.results.map((r) => ({
+        ...r,
+        node: {
+          ...r.node,
+          metadata: {
+            ...r.node.metadata,
+            chapters: params.include_chapters
+              ? r.node.metadata.chapters.map(
+                  (chapterIdx) => bookDetails.fullHeadings[chapterIdx],
+                )
+              : undefined,
+          },
+          highlights: undefined,
+        },
+      })),
+    };
+  }
 
   async searchWithinBook(params: SearchParamsDto) {
     const { bookId, versionId, q: query, type } = params;
