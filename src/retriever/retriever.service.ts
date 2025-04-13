@@ -31,21 +31,42 @@ export class RetrieverService {
   }
 
   async azureGetSourcesFromBook({
-    id,
-    sourceAndVersion,
+    books,
     query,
     type = 'vector',
     limit = 5,
     page = 1,
   }: {
-    id: string;
-    sourceAndVersion: string;
+    books?: {
+      id: string;
+      sourceAndVersion?: string; // source:version
+    }[];
     query: string;
     type: 'vector' | 'text';
     limit?: number;
     page?: number;
   }) {
-    const filter = odata`book_id eq '${id}' and book_version_id eq '${sourceAndVersion}'`;
+    let filter: string | undefined;
+    if (books) {
+      if (books.length === 1) {
+        const firstBook = books[0]!;
+        filter = odata`book_id eq '${firstBook.id}'`;
+        if (firstBook.sourceAndVersion) {
+          filter += ` and book_version_id eq '${firstBook.sourceAndVersion}'`;
+        }
+      } else {
+        filter = books
+          .map(
+            (b) =>
+              odata`(book_id eq '${b.id}'${
+                b.sourceAndVersion
+                  ? ` and book_version_id eq '${b.sourceAndVersion}'`
+                  : ''
+              })`,
+          )
+          .join(' or ');
+      }
+    }
 
     let results: SearchDocumentsResult<
       KeywordSearchBookChunk | VectorSearchBookChunk,
@@ -101,6 +122,7 @@ export class RetrieverService {
               highlights: r.highlights?.chunk_content ?? [],
               metadata: {
                 bookId: r.document.book_id,
+                sourceAndVersion: r.document.book_version_id,
                 pages: r.document.pages,
                 chapters: r.document.chapters,
               },
@@ -115,6 +137,7 @@ export class RetrieverService {
             highlights: r.highlights?.content ?? [],
             metadata: {
               bookId: r.document.book_id,
+              sourceAndVersion: r.document.book_version_id,
               pages: [
                 {
                   index: r.document.index,

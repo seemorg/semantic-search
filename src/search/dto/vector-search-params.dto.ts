@@ -28,3 +28,9 @@ export class VectorSearchParamsDto {
   @Max(50)
   limit: number = 10;
 }
+
+export class VectorSearchManyParamsDto extends VectorSearchParamsDto {
+  @IsString()
+  @IsOptional()
+  books: string;
+}

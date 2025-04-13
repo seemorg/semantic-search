@@ -93,8 +93,12 @@ export class ChatService {
 
     const sources = await this.retrieverService
       .azureGetSourcesFromBook({
-        id: bookDetails.book.id,
-        sourceAndVersion: `${version.source}:${version.value}`,
+        books: [
+          {
+            id: bookDetails.book.id,
+            sourceAndVersion: `${version.source}:${version.value}`,
+          },
+        ],
         query: ragQuery,
         type: 'vector',
       })

@@ -1,7 +1,10 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { SearchParamsDto } from './dto/search-params.dto';
-import { VectorSearchParamsDto } from './dto/vector-search-params.dto';
+import {
+  VectorSearchManyParamsDto,
+  VectorSearchParamsDto,
+} from './dto/vector-search-params.dto';
 import { UseApiKey } from 'src/shared/api-key.guard';
 
 @Controller('/')
@@ -21,11 +24,36 @@ export class SearchController {
     @Param('versionId') versionId: string,
     @Query() params: VectorSearchParamsDto,
   ) {
-    const results = await this.searchService.vectorSearch(
-      bookId,
-      versionId,
-      params,
-    );
+    const results = await this.searchService.vectorSearch(params, [
+      {
+        id: bookId,
+        versionId,
+      },
+    ]);
+
+    return results;
+  }
+
+  @Get('/v1/vector-search')
+  @UseApiKey()
+  async vectorSearchMany(@Query() params: VectorSearchManyParamsDto) {
+    let books:
+      | {
+          id: string;
+          versionId: string;
+        }[]
+      | undefined;
+    if (params.books) {
+      books = params.books.split(',').map((pair) => {
+        const [bookId, versionId] = pair.split(':');
+        return {
+          id: bookId,
+          versionId,
+        };
+      });
+    }
+
+    const results = await this.searchService.vectorSearch(params, books);
 
     return results;
   }
