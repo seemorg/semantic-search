@@ -118,6 +118,7 @@ export class RetrieverService {
           return {
             score: r.score,
             node: {
+              id: r.document.id,
               text: r.document.chunk_content,
               highlights: r.highlights?.chunk_content ?? [],
               metadata: {
@@ -133,6 +134,7 @@ export class RetrieverService {
         return {
           score: r.score,
           node: {
+            id: r.document.id,
             text: r.document.content,
             highlights: r.highlights?.content ?? [],
             metadata: {

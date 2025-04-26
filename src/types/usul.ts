@@ -2,6 +2,8 @@ interface BookVersion {
   id: string;
   source: 'openiti' | 'turath' | 'external' | 'pdf';
   value: string;
+  aiSupported?: boolean;
+  keywordSupported?: boolean;
   publicationDetails?: {
     investigator?: string;
     publisher?: string;

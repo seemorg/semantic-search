@@ -27,6 +27,10 @@ export class VectorSearchParamsDto {
   @Min(1)
   @Max(50)
   limit: number = 10;
+
+  @IsOptional()
+  @IsBoolean()
+  include_details: boolean = false;
 }
 
 export class VectorSearchManyParamsDto extends VectorSearchParamsDto {

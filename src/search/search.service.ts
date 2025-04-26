@@ -30,6 +30,50 @@ export class SearchService {
     tracingName: 'Search.OpenAI.Book',
   });
 
+  private async loadBookDetails(books: { id: string; versionId?: string }[]) {
+    const bookDetails: Record<string, BookDetails> = {};
+    const booksToSearch: {
+      id: string;
+      sourceAndVersion: string;
+    }[] = [];
+
+    const results = await Promise.all(
+      books.map(
+        async (b) => {
+          const data = await this.usulService.getBookDetails(b.id);
+          const version = data.book.versions.find((v) =>
+            b.versionId ? v.id === b.versionId : v.aiSupported,
+          );
+
+          if (!version) {
+            throw new BadRequestException(
+              `Version "${b.versionId}" is not found for book "${b.id}"`,
+            );
+          }
+
+          return {
+            ...data,
+            sourceAndVersion: `${version.source}:${version.value}`,
+            versionId: version.id,
+          };
+        },
+        {} as Record<string, BookDetails>,
+      ),
+    );
+
+    for (const result of results) {
+      const searchEntry = {
+        id: result.book.id,
+        sourceAndVersion: result.sourceAndVersion,
+      };
+
+      bookDetails[`${result.book.id}:${result.sourceAndVersion}`] = result;
+      booksToSearch.push(searchEntry);
+    }
+
+    return { bookDetails, booksToSearch };
+  }
+
   async vectorSearch(
     params: VectorSearchParamsDto,
     books?: {
@@ -39,71 +83,51 @@ export class SearchService {
   ) {
     const { q: query, limit, page } = params;
 
-    let bookDetails: Record<string, BookDetails> | undefined;
-    let booksToSearch:
-      | {
-          id: string;
-          sourceAndVersion: string;
-        }[]
+    let detailsResult:
+      | Awaited<ReturnType<typeof this.loadBookDetails>>
       | undefined;
     if (books) {
-      const results = await Promise.all(
-        books.map(
-          async (b) => {
-            const data = await this.usulService.getBookDetails(b.id);
-            const version = data.book.versions.find(
-              (v) => v.id === b.versionId,
-            );
-
-            if (!version) {
-              throw new BadRequestException(
-                `Version "${b.versionId}" is not found for book "${b.id}"`,
-              );
-            }
-
-            return {
-              ...data,
-              sourceAndVersion: `${version.source}:${version.value}`,
-              versionId: version.id,
-            };
-          },
-          {} as Record<string, BookDetails>,
-        ),
-      );
-
-      for (const result of results) {
-        const searchEntry = {
-          id: result.book.id,
-          sourceAndVersion: result.sourceAndVersion,
-        };
-
-        if (!bookDetails) bookDetails = {};
-        if (!booksToSearch) booksToSearch = [];
-
-        bookDetails[`${result.book.id}:${result.sourceAndVersion}`] = result;
-        booksToSearch.push(searchEntry);
-      }
+      detailsResult = await this.loadBookDetails(books);
     }
 
     const results = await this.retrieverService.azureGetSourcesFromBook({
-      books: booksToSearch,
+      books: detailsResult ? detailsResult.booksToSearch : undefined,
       query,
       type: 'vector',
       limit,
       page,
     });
 
+    // fetch the details for the books returned
+    if (params.include_details && !detailsResult) {
+      const booksToSearch: string[] = [];
+
+      for (const result of results.results) {
+        const bookId = result.node.metadata.bookId;
+        if (!booksToSearch.includes(bookId)) {
+          booksToSearch.push(bookId);
+        }
+      }
+
+      detailsResult = await this.loadBookDetails(
+        booksToSearch.map((id) => ({ id })),
+      );
+    }
+
     return {
       ...results,
       results: results.results.map((r) => {
         const sourceAndVersion = r.node.metadata.sourceAndVersion;
-        const details = bookDetails
-          ? bookDetails[`${r.node.metadata.bookId}:${sourceAndVersion}`]
+        const details = detailsResult
+          ? detailsResult.bookDetails[
+              `${r.node.metadata.bookId}:${sourceAndVersion}`
+            ]
           : null;
 
         return {
           ...r,
           node: {
+            id: r.node.id,
             ...r.node,
             metadata: {
               ...r.node.metadata,
@@ -122,6 +146,22 @@ export class SearchService {
                     )
                   : undefined,
             },
+            ...(params.include_details && {
+              book: {
+                slug: details.book.slug,
+                primaryName: details.book.primaryName,
+                secondaryName: details.book.secondaryName,
+                transliteration: details.book.transliteration,
+                author: {
+                  slug: details.book.author.slug,
+                  primaryName: details.book.author.primaryName,
+                  secondaryName: details.book.author.secondaryName,
+                  transliteration: details.book.author.transliteration,
+                  year: details.book.author.year,
+                },
+              },
+              versionId: details.versionId,
+            }),
             highlights: undefined,
           },
         };
