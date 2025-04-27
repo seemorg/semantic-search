@@ -74,8 +74,9 @@ export class SearchService {
     return { bookDetails, booksToSearch };
   }
 
-  async vectorSearch(
+  async search(
     params: VectorSearchParamsDto,
+    type: 'vector' | 'text',
     books?: {
       id: string;
       versionId: string;
@@ -93,7 +94,7 @@ export class SearchService {
     const results = await this.retrieverService.azureGetSourcesFromBook({
       books: detailsResult ? detailsResult.booksToSearch : undefined,
       query,
-      type: 'vector',
+      type,
       limit,
       page,
     });
@@ -117,6 +118,9 @@ export class SearchService {
     return {
       ...results,
       results: results.results.map((r) => {
+        const includeHighlights =
+          type === 'text' && r.node.highlights && r.node.highlights.length > 0;
+
         const sourceAndVersion = r.node.metadata.sourceAndVersion;
         const details = detailsResult
           ? detailsResult.bookDetails[
@@ -129,6 +133,7 @@ export class SearchService {
           node: {
             id: r.node.id,
             ...r.node,
+            text: includeHighlights ? undefined : r.node.text,
             metadata: {
               ...r.node.metadata,
               versionId: details ? details.versionId : undefined,
@@ -162,7 +167,7 @@ export class SearchService {
               },
               versionId: details.versionId,
             }),
-            highlights: undefined,
+            highlights: includeHighlights ? r.node.highlights : undefined,
           },
         };
       }),

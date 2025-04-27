@@ -1,3 +1,4 @@
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsNotEmpty,
@@ -34,7 +35,29 @@ export class VectorSearchParamsDto {
 }
 
 export class VectorSearchManyParamsDto extends VectorSearchParamsDto {
-  @IsString()
+  @Type(() => String)
   @IsOptional()
-  books: string;
+  @Transform(({ value }: { value: string }) => {
+    let books:
+      | {
+          id: string;
+          versionId: string;
+        }[]
+      | undefined;
+    if (value) {
+      books = value.split(',').map((pair) => {
+        const [bookId, versionId] = pair.split(':');
+        return {
+          id: bookId,
+          versionId,
+        };
+      });
+    }
+
+    return books;
+  })
+  books?: {
+    id: string;
+    versionId: string;
+  }[];
 }

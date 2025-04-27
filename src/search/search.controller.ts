@@ -24,7 +24,7 @@ export class SearchController {
     @Param('versionId') versionId: string,
     @Query() params: VectorSearchParamsDto,
   ) {
-    const results = await this.searchService.vectorSearch(params, [
+    const results = await this.searchService.search(params, 'vector', [
       {
         id: bookId,
         versionId,
@@ -34,26 +34,26 @@ export class SearchController {
     return results;
   }
 
+  @Get('/v1/keyword-search')
+  @UseApiKey()
+  async keywordSearchMany(@Query() params: VectorSearchManyParamsDto) {
+    const results = await this.searchService.search(
+      params,
+      'text',
+      params.books,
+    );
+
+    return results;
+  }
+
   @Get('/v1/vector-search')
   @UseApiKey()
   async vectorSearchMany(@Query() params: VectorSearchManyParamsDto) {
-    let books:
-      | {
-          id: string;
-          versionId: string;
-        }[]
-      | undefined;
-    if (params.books) {
-      books = params.books.split(',').map((pair) => {
-        const [bookId, versionId] = pair.split(':');
-        return {
-          id: bookId,
-          versionId,
-        };
-      });
-    }
-
-    const results = await this.searchService.vectorSearch(params, books);
+    const results = await this.searchService.search(
+      params,
+      'vector',
+      params.books,
+    );
 
     return results;
   }
