@@ -1,18 +1,18 @@
 ARG NODE_VERSION=22.12.0
-FROM node:${NODE_VERSION}-slim as base
+FROM node:${NODE_VERSION}-slim AS base
 
 # NestJS app lives here
 WORKDIR /app
 
 # Set production environment
-ENV PORT 3000
-ENV PNPM_HOME "/pnpm"
-ENV PATH "$PNPM_HOME:$PATH"
+ENV PORT=3000
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 
 RUN npm install -g corepack@latest
 RUN corepack enable
 
-FROM base as builder
+FROM base AS builder
 
 # Install packages needed to build node modules
 RUN apt-get update -qq && \
@@ -25,7 +25,7 @@ RUN pnpm build
 
 FROM base AS runner
 COPY --from=builder /app /app
-ENV NODE_ENV "production"
+ENV NODE_ENV="production"
 
 EXPOSE ${PORT}
 
