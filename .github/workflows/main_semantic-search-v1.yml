@@ -21,18 +21,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: Log in to container registry
+        uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          registry: index.docker.io/
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_7F04F6FF8F0E4D8AB8A3433C64908C78 }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_CF8212350A62462AB650092842933093 }}
 
       - name: Build and push container image to registry
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_AAE219D9F79344588C3F0720DB220F20 }}/semantic-search:${{ github.sha }}
+          tags: index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_7F04F6FF8F0E4D8AB8A3433C64908C78 }}/semantic-search:${{ github.sha }}
           file: ./Dockerfile
 
   deploy:
@@ -48,9 +49,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_BA48E498C8724F31AAB1485476C2BD50 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D0EA63C78DA3406399049B6A2CBD472F }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B40DF81ABB64497386512EE36FD56691 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_E32B8D3795D94C0EA08826DFB8D682BF }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3CDA93502A754CF6A5D5504ED6C719A7 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_123D63D9BFC44E2393E1FF024A62AF2E }}
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -58,7 +59,5 @@ jobs:
         with:
           app-name: 'semantic-search-v1'
           slot-name: 'Production'
-          images: 'index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_AAE219D9F79344588C3F0720DB220F20 }}/semantic-search:${{ github.sha }}'
-
+          images: 'index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_7F04F6FF8F0E4D8AB8A3433C64908C78 }}/semantic-search:${{ github.sha }}'
           
-
