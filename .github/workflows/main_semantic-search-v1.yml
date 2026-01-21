@@ -61,3 +61,4 @@ jobs:
           images: 'index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_AAE219D9F79344588C3F0720DB220F20 }}/semantic-search:${{ github.sha }}'
 
           
+
