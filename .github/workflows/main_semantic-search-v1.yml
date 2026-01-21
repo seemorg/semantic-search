@@ -25,15 +25,15 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: index.docker.io/
-          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_F5EA042A4D64400AA367D17FFFE353E0 }}
-          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_18CD5992E18744978199757DA5DD9126 }}
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_AAE219D9F79344588C3F0720DB220F20 }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_D244AE1B809546458B63E7B305D5B729 }}
 
       - name: Build and push container image to registry
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_F5EA042A4D64400AA367D17FFFE353E0 }}/ahmedriad1/usul-semantic-search:${{ github.sha }}
+          tags: index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_AAE219D9F79344588C3F0720DB220F20 }}/semantic-search:${{ github.sha }}
           file: ./Dockerfile
 
   deploy:
@@ -49,9 +49,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_385E40DBD95146DEBCC61ED3CC2F9CB4 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B94C294856844C099B6EF29A82EE0965 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D7988B1B29434FACBBA0ED3F224F8405 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_BA48E498C8724F31AAB1485476C2BD50 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D0EA63C78DA3406399049B6A2CBD472F }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B40DF81ABB64497386512EE36FD56691 }}
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -59,5 +59,5 @@ jobs:
         with:
           app-name: 'semantic-search-v1'
           slot-name: 'Production'
-          images: 'index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_F5EA042A4D64400AA367D17FFFE353E0 }}/ahmedriad1/usul-semantic-search:${{ github.sha }}'
+          images: 'index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_AAE219D9F79344588C3F0720DB220F20 }}/semantic-search:${{ github.sha }}'
           
