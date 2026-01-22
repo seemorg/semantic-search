@@ -1,7 +1,4 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
-name: Build and deploy container app to Azure Web App - semantic-search-v1
+name: ⬆️ Build and deploy | semantic-search-v1
 
 on:
   push:
@@ -61,3 +58,4 @@ jobs:
           images: 'index.docker.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_076D98895EAD480585040A7ACCAAD0B4 }}/semantic-search:${{ github.sha }}'
 
           
+
